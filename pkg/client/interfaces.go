@@ -19,6 +19,8 @@ package client
 import (
 	"context"
 
+	"github.com/kcp-dev/logicalcluster"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,12 +29,15 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-// ObjectKey identifies a Kubernetes Object.
-type ObjectKey = types.NamespacedName
+type ObjectKey struct {
+	types.NamespacedName
+
+	Cluster logicalcluster.Name
+}
 
 // ObjectKeyFromObject returns the ObjectKey given a runtime.Object.
 func ObjectKeyFromObject(obj Object) ObjectKey {
-	return ObjectKey{Namespace: obj.GetNamespace(), Name: obj.GetName()}
+	return ObjectKey{NamespacedName: types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, Cluster: logicalcluster.From(obj)}
 }
 
 // Patch is a patch that can be applied to a Kubernetes object.
