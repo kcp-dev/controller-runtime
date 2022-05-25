@@ -54,7 +54,9 @@ func newSpecificInformersMap(config *rest.Config,
 	namespace string,
 	selectors SelectorsByGVK,
 	disableDeepCopy DisableDeepCopyByGVK,
-	createListWatcher createListWatcherFunc) *specificInformersMap {
+	createListWatcher createListWatcherFunc,
+	keyFunction cache.KeyFunc) *specificInformersMap {
+
 	ip := &specificInformersMap{
 		config:            config,
 		Scheme:            scheme,
@@ -68,6 +70,7 @@ func newSpecificInformersMap(config *rest.Config,
 		namespace:         namespace,
 		selectors:         selectors.forGVK,
 		disableDeepCopy:   disableDeepCopy,
+		keyFunction:       keyFunction,
 	}
 	return ip
 }
@@ -135,6 +138,8 @@ type specificInformersMap struct {
 
 	// disableDeepCopy indicates not to deep copy objects during get or list objects.
 	disableDeepCopy DisableDeepCopyByGVK
+
+	keyFunction cache.KeyFunc
 }
 
 // Start calls Run on each of the informers and sets started to true.  Blocks on the context.
@@ -224,9 +229,12 @@ func (ip *specificInformersMap) addInformerToMap(gvk schema.GroupVersionKind, ob
 	if err != nil {
 		return nil, false, err
 	}
-	ni := cache.NewSharedIndexInformer(lw, obj, resyncPeriod(ip.resync)(), cache.Indexers{
-		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
-	})
+	ni := cache.NewSharedIndexInformerWithOptions(lw, obj,
+		cache.WithResyncPeriod(resyncPeriod(ip.resync)()),
+		cache.WithKeyFunction(ip.keyFunction),
+		cache.WithIndexers(cache.Indexers{
+			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+		}))
 	rm, err := ip.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, false, err
