@@ -109,6 +109,8 @@ type Options struct {
 	// So that all informers will not send list requests simultaneously.
 	Resync *time.Duration
 
+	// KeyFunction is the cache.KeyFunc that the informers will be configured to use
+	// Defaults to cache.MetaNamespaceKeyFunc from client-go
 	KeyFunction cache.KeyFunc
 
 	// Namespace restricts the cache's ListWatch to the desired namespace

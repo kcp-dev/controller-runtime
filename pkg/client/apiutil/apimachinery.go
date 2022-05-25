@@ -123,6 +123,9 @@ func RESTClientForGVK(gvk schema.GroupVersionKind, isUnstructured bool, baseConf
 	return rest.RESTClientFor(createRestConfig(gvk, isUnstructured, baseConfig, codecs))
 }
 
+// RESTClientForGVKAndClient constructs a new rest.Interface capable of accessing the resource associated
+// wwith the give GroupVersionKind. The REST client will be configured to use provided http.Client, and the
+// negotiated serializer from baseConfig, if set.
 func RESTClientForGVKAndClient(gvk schema.GroupVersionKind, client *http.Client, isUnstructured bool, baseConfig *rest.Config, codecs serializer.CodecFactory) (rest.Interface, error) {
 	return rest.RESTClientForConfigAndClient(createRestConfig(gvk, isUnstructured, baseConfig, codecs), client)
 }
