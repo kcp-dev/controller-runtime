@@ -36,7 +36,7 @@ type clientCache struct {
 	// config is the rest.Config to talk to an apiserver
 	config *rest.Config
 
-	// httpclient is the http.Client to talk to an apiserver
+	// httpClient is the http.Client to talk to an apiserver
 	httpClient *http.Client
 
 	// scheme maps go structs to GroupVersionKinds
