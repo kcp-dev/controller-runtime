@@ -90,7 +90,7 @@ func newClient(config *rest.Config, options Options) (*client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Could not create HTTPClient from config")
 		}
-		opts.HTTPClient = httpClient
+		options.HTTPClient = httpClient
 	}
 
 	if !options.Opts.SuppressWarnings {
