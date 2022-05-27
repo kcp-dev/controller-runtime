@@ -139,6 +139,7 @@ type specificInformersMap struct {
 	// disableDeepCopy indicates not to deep copy objects during get or list objects.
 	disableDeepCopy DisableDeepCopyByGVK
 
+	// keyFunction is the cache.KeyFunc informers will be configured to use
 	keyFunction cache.KeyFunc
 }
 

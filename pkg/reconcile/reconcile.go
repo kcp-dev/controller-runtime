@@ -45,7 +45,7 @@ func (r *Result) IsZero() bool {
 // information to uniquely identify the object - its Name and Namespace.  It does NOT contain information about
 // any specific Event or the object contents itself.
 type Request struct {
-	// NamespacedName is the name and namespace of the object to reconcile.
+	// ObjectKey is the name, namespace, and cluster of the object to reconcile.
 	client.ObjectKey
 }
 
