@@ -113,6 +113,10 @@ type Options struct {
 	// Defaults to cache.MetaNamespaceKeyFunc from client-go
 	KeyFunction cache.KeyFunc
 
+	// Indexers is the indexers that the informers will be configured to use.
+	// Will always have the standard NamespaceIndex.
+	Indexers cache.Indexers
+
 	// Namespace restricts the cache's ListWatch to the desired namespace
 	// Default watches all namespaces
 	Namespace string
@@ -151,7 +155,7 @@ func New(config *rest.Config, opts Options) (Cache, error) {
 	if err != nil {
 		return nil, err
 	}
-	im := internal.NewInformersMap(config, opts.Scheme, opts.Mapper, *opts.Resync, opts.Namespace, selectorsByGVK, disableDeepCopyByGVK, opts.KeyFunction)
+	im := internal.NewInformersMap(config, opts.Scheme, opts.Mapper, *opts.Resync, opts.Namespace, selectorsByGVK, disableDeepCopyByGVK, opts.KeyFunction, opts.Indexers)
 	return &informerCache{InformersMap: im}, nil
 }
 

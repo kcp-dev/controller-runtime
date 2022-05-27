@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"k8s.io/client-go/rest"
+	k8scache "k8s.io/client-go/tools/cache"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
@@ -44,11 +45,15 @@ func NewClusterAwareManager(cfg *rest.Config, options ctrl.Options) (manager.Man
 	return ctrl.NewManager(cfg, options)
 }
 
-// NewClusterAwareCache returns a cache.Cache that handles multi-cluster watches.
+// NewClusterAwareCache returns ak8scache.Cache that handles multi-cluster watches.
 func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 	c := rest.CopyConfig(config)
 	c.Host += "/clusters/*"
 	opts.KeyFunction = kcpcache.ClusterAwareKeyFunc
+	opts.Indexers = k8scache.Indexers{
+		kcpcache.ClusterIndexName:             kcpcache.ClusterIndexFunc,
+		kcpcache.ClusterAndNamespaceIndexName: kcpcache.ClusterAndNamespaceIndexFunc,
+	}
 	return cache.New(c, opts)
 }
 

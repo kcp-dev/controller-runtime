@@ -141,6 +141,10 @@ type specificInformersMap struct {
 
 	// keyFunction is the cache.KeyFunc informers will be configured to use
 	keyFunction cache.KeyFunc
+
+	// AdditionalIndexers is the indexers that the informers will be configured to use.
+	// Will not allow overwriting the standard NamespaceIndex.
+	AdditionalIndexers cache.Indexers
 }
 
 // Start calls Run on each of the informers and sets started to true.  Blocks on the context.
@@ -230,12 +234,16 @@ func (ip *specificInformersMap) addInformerToMap(gvk schema.GroupVersionKind, ob
 	if err != nil {
 		return nil, false, err
 	}
+	indexers := cache.Indexers{}
+	for indexName, indexer := range ip.AdditionalIndexers {
+		indexers[indexName] = indexer
+	}
+	indexers[cache.NamespaceIndex] = cache.MetaNamespaceIndexFunc
+
 	ni := cache.NewSharedIndexInformerWithOptions(lw, obj,
 		cache.WithResyncPeriod(resyncPeriod(ip.resync)()),
 		cache.WithKeyFunction(ip.keyFunction),
-		cache.WithIndexers(cache.Indexers{
-			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
-		}))
+		cache.WithIndexers(indexers))
 	rm, err := ip.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, false, err

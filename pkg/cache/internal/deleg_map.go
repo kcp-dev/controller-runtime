@@ -53,6 +53,7 @@ func NewInformersMap(config *rest.Config,
 	selectors SelectorsByGVK,
 	disableDeepCopy DisableDeepCopyByGVK,
 	keyFunc cache.KeyFunc,
+	indexers cache.Indexers,
 ) *InformersMap {
 	return &InformersMap{
 		structured:   newStructuredInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, keyFunc),
