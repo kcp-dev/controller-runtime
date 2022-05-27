@@ -53,11 +53,12 @@ func NewInformersMap(config *rest.Config,
 	selectors SelectorsByGVK,
 	disableDeepCopy DisableDeepCopyByGVK,
 	keyFunc cache.KeyFunc,
+	indexers cache.Indexers,
 ) *InformersMap {
 	return &InformersMap{
-		structured:   newStructuredInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, keyFunc),
-		unstructured: newUnstructuredInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, keyFunc),
-		metadata:     newMetadataInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, keyFunc),
+		structured:   newStructuredInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, keyFunc, indexers),
+		unstructured: newUnstructuredInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, keyFunc, indexers),
+		metadata:     newMetadataInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, keyFunc, indexers),
 
 		Scheme: scheme,
 	}
@@ -109,18 +110,18 @@ func (m *InformersMap) Get(ctx context.Context, gvk schema.GroupVersionKind, obj
 
 // newStructuredInformersMap creates a new InformersMap for structured objects.
 func newStructuredInformersMap(config *rest.Config, scheme *runtime.Scheme, mapper meta.RESTMapper, resync time.Duration,
-	namespace string, selectors SelectorsByGVK, disableDeepCopy DisableDeepCopyByGVK, keyFunc cache.KeyFunc) *specificInformersMap {
-	return newSpecificInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, createStructuredListWatch, keyFunc)
+	namespace string, selectors SelectorsByGVK, disableDeepCopy DisableDeepCopyByGVK, keyFunc cache.KeyFunc, indexers cache.Indexers) *specificInformersMap {
+	return newSpecificInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, createStructuredListWatch, keyFunc, indexers)
 }
 
 // newUnstructuredInformersMap creates a new InformersMap for unstructured objects.
 func newUnstructuredInformersMap(config *rest.Config, scheme *runtime.Scheme, mapper meta.RESTMapper, resync time.Duration,
-	namespace string, selectors SelectorsByGVK, disableDeepCopy DisableDeepCopyByGVK, keyFunc cache.KeyFunc) *specificInformersMap {
-	return newSpecificInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, createUnstructuredListWatch, keyFunc)
+	namespace string, selectors SelectorsByGVK, disableDeepCopy DisableDeepCopyByGVK, keyFunc cache.KeyFunc, indexers cache.Indexers) *specificInformersMap {
+	return newSpecificInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, createUnstructuredListWatch, keyFunc, indexers)
 }
 
 // newMetadataInformersMap creates a new InformersMap for metadata-only objects.
 func newMetadataInformersMap(config *rest.Config, scheme *runtime.Scheme, mapper meta.RESTMapper, resync time.Duration,
-	namespace string, selectors SelectorsByGVK, disableDeepCopy DisableDeepCopyByGVK, keyFunc cache.KeyFunc) *specificInformersMap {
-	return newSpecificInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, createMetadataListWatch, keyFunc)
+	namespace string, selectors SelectorsByGVK, disableDeepCopy DisableDeepCopyByGVK, keyFunc cache.KeyFunc, indexers cache.Indexers) *specificInformersMap {
+	return newSpecificInformersMap(config, scheme, mapper, resync, namespace, selectors, disableDeepCopy, createMetadataListWatch, keyFunc, indexers)
 }

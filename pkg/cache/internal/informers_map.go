@@ -55,22 +55,24 @@ func newSpecificInformersMap(config *rest.Config,
 	selectors SelectorsByGVK,
 	disableDeepCopy DisableDeepCopyByGVK,
 	createListWatcher createListWatcherFunc,
-	keyFunction cache.KeyFunc) *specificInformersMap {
+	keyFunction cache.KeyFunc,
+	indexers cache.Indexers) *specificInformersMap {
 
 	ip := &specificInformersMap{
-		config:            config,
-		Scheme:            scheme,
-		mapper:            mapper,
-		informersByGVK:    make(map[schema.GroupVersionKind]*MapEntry),
-		codecs:            serializer.NewCodecFactory(scheme),
-		paramCodec:        runtime.NewParameterCodec(scheme),
-		resync:            resync,
-		startWait:         make(chan struct{}),
-		createListWatcher: createListWatcher,
-		namespace:         namespace,
-		selectors:         selectors.forGVK,
-		disableDeepCopy:   disableDeepCopy,
-		keyFunction:       keyFunction,
+		config:             config,
+		Scheme:             scheme,
+		mapper:             mapper,
+		informersByGVK:     make(map[schema.GroupVersionKind]*MapEntry),
+		codecs:             serializer.NewCodecFactory(scheme),
+		paramCodec:         runtime.NewParameterCodec(scheme),
+		resync:             resync,
+		startWait:          make(chan struct{}),
+		createListWatcher:  createListWatcher,
+		namespace:          namespace,
+		selectors:          selectors.forGVK,
+		disableDeepCopy:    disableDeepCopy,
+		keyFunction:        keyFunction,
+		additionalIndexers: indexers,
 	}
 	return ip
 }
@@ -141,6 +143,10 @@ type specificInformersMap struct {
 
 	// keyFunction is the cache.KeyFunc informers will be configured to use
 	keyFunction cache.KeyFunc
+
+	// additionalIndexers is the indexers that the informers will be configured to use.
+	// Will not allow overwriting the standard NamespaceIndex.
+	additionalIndexers cache.Indexers
 }
 
 // Start calls Run on each of the informers and sets started to true.  Blocks on the context.
@@ -230,12 +236,16 @@ func (ip *specificInformersMap) addInformerToMap(gvk schema.GroupVersionKind, ob
 	if err != nil {
 		return nil, false, err
 	}
+	indexers := cache.Indexers{}
+	for indexName, indexer := range ip.additionalIndexers {
+		indexers[indexName] = indexer
+	}
+	indexers[cache.NamespaceIndex] = cache.MetaNamespaceIndexFunc
+
 	ni := cache.NewSharedIndexInformerWithOptions(lw, obj,
 		cache.WithResyncPeriod(resyncPeriod(ip.resync)()),
 		cache.WithKeyFunction(ip.keyFunction),
-		cache.WithIndexers(cache.Indexers{
-			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
-		}))
+		cache.WithIndexers(indexers))
 	rm, err := ip.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, false, err
