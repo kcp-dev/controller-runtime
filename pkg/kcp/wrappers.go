@@ -18,18 +18,21 @@ package kcp
 
 import (
 	"net/http"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/rest"
 	k8scache "k8s.io/client-go/tools/cache"
-
-	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
 )
 
 // NewClusterAwareManager returns a kcp-aware manager with appropriate defaults for cache and
@@ -38,8 +41,13 @@ func NewClusterAwareManager(cfg *rest.Config, options ctrl.Options) (manager.Man
 	if options.NewCache == nil {
 		options.NewCache = NewClusterAwareCache
 	}
+
 	if options.NewClient == nil {
 		options.NewClient = NewClusterAwareClient
+	}
+
+	if options.MapperProvider == nil {
+		options.MapperProvider = NewClusterAwareMapperProvider
 	}
 
 	return ctrl.NewManager(cfg, options)
@@ -88,4 +96,14 @@ func ClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
 
 	httpClient.Transport = kcpclient.NewClusterRoundTripper(httpClient.Transport)
 	return httpClient, nil
+}
+
+// NewClusterAwareMapperProvider is a MapperProvider that returns a logical cluster aware meta.RESTMapper.
+func NewClusterAwareMapperProvider(c *rest.Config) (meta.RESTMapper, error) {
+	mapperCfg := rest.CopyConfig(c)
+	if !strings.HasSuffix(mapperCfg.Host, "/clusters/*") {
+		mapperCfg.Host += "/clusters/*"
+	}
+
+	return apiutil.NewDynamicRESTMapper(mapperCfg)
 }
