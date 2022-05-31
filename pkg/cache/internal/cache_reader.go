@@ -22,6 +22,8 @@ import (
 	"reflect"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
@@ -106,14 +108,24 @@ func (c *CacheReader) Get(_ context.Context, key client.ObjectKey, out client.Ob
 }
 
 // List lists items out of the indexer and writes them to out.
-func (c *CacheReader) List(_ context.Context, out client.ObjectList, opts ...client.ListOption) error {
+func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...client.ListOption) error {
 	var objs []interface{}
 	var err error
 
 	listOpts := client.ListOptions{}
 	listOpts.ApplyOptions(opts)
 
+	// TODO(kcp), should we just require people to pass in the cluster list option, or maybe provide
+	// a wrapper that adds it from the context automatically rather than doing this?
+	// It may also make more sense to just use the context and not bother provided a ListOption for it
+	if listOpts.Cluster.Empty() {
+		if cluster, ok := kcpclient.ClusterFromContext(ctx); ok {
+			client.InCluster(cluster).ApplyToList(&listOpts)
+		}
+	}
+
 	switch {
+	// TODO(kcp) add cluster to this case
 	case listOpts.FieldSelector != nil:
 		// TODO(directxman12): support more complicated field selectors by
 		// combining multiple indices, GetIndexers, etc
@@ -125,10 +137,12 @@ func (c *CacheReader) List(_ context.Context, out client.ObjectList, opts ...cli
 		// namespaced index key.  Otherwise, ask for the non-namespaced variant by using the fake "all namespaces"
 		// namespace.
 		objs, err = c.indexer.ByIndex(FieldIndexName(field), KeyToNamespacedKey(listOpts.Namespace, val))
-	case listOpts.Namespace != "":
-		objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
-	default:
+	case listOpts.Cluster.Empty():
 		objs = c.indexer.List()
+	case listOpts.Namespace != "":
+		objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ToClusterAwareKey(listOpts.Cluster.String(), listOpts.Namespace, ""))
+	default:
+		objs, err = c.indexer.ByIndex(kcpcache.ClusterIndexName, kcpcache.ToClusterAwareKey(listOpts.Cluster.String(), "", ""))
 	}
 	if err != nil {
 		return err
