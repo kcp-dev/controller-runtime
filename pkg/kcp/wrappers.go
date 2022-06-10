@@ -57,7 +57,8 @@ func NewClusterAwareManager(cfg *rest.Config, options ctrl.Options) (manager.Man
 func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 	c := rest.CopyConfig(config)
 	c.Host += "/clusters/*"
-	opts.KeyFunction = kcpcache.ClusterAwareKeyFunc
+	opts.NewInformerFunc = NewSharedIndexInformer
+
 	opts.Indexers = k8scache.Indexers{
 		kcpcache.ClusterIndexName:             kcpcache.ClusterIndexFunc,
 		kcpcache.ClusterAndNamespaceIndexName: kcpcache.ClusterAndNamespaceIndexFunc,

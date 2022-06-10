@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -137,11 +136,9 @@ func (e *EnqueueRequestForOwner) getOwnerReconcileRequest(object metav1.Object, 
 		if ref.Kind == e.groupKind.Kind && refGV.Group == e.groupKind.Group {
 			// Match found - add a Request for the object referred to in the OwnerReference
 			request := reconcile.Request{
+				ClusterName: logicalcluster.From(object).String(),
 				ObjectKey: client.ObjectKey{
-					Cluster: logicalcluster.From(object),
-					NamespacedName: types.NamespacedName{
-						Name: ref.Name,
-					},
+					Name: ref.Name,
 				},
 			}
 

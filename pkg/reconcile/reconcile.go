@@ -47,6 +47,10 @@ func (r *Result) IsZero() bool {
 type Request struct {
 	// ObjectKey is the name, namespace, and cluster of the object to reconcile.
 	client.ObjectKey
+
+	// ClusterName can be used for reconciling requests across multiple clusters,
+	// to prevent objects with the same name and namespace from conflicting
+	ClusterName string
 }
 
 /*

@@ -36,6 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// TODO(KCP) need to implement and plumb through our own cache reader
+
 // CacheReader is a client.Reader.
 var _ client.Reader = &CacheReader{}
 
@@ -57,11 +59,11 @@ type CacheReader struct {
 }
 
 // Get checks the indexer for the object and writes a copy of it if found.
-func (c *CacheReader) Get(_ context.Context, key client.ObjectKey, out client.Object) error {
+func (c *CacheReader) Get(ctx context.Context, key client.ObjectKey, out client.Object) error {
 	if c.scopeName == apimeta.RESTScopeNameRoot {
 		key.Namespace = ""
 	}
-	storeKey := objectKeyToStoreKey(key)
+	storeKey := objectKeyToStoreKey(ctx, key)
 
 	// Lookup the object from the indexer cache
 	obj, exists, err := c.indexer.GetByKey(storeKey)
@@ -194,8 +196,16 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 // It's akin to MetaNamespaceKeyFunc.  It's separate from
 // String to allow keeping the key format easily in sync with
 // MetaNamespaceKeyFunc.
-func objectKeyToStoreKey(k client.ObjectKey) string {
-	return kcpcache.ToClusterAwareKey(k.Cluster.String(), k.Namespace, k.Name)
+func objectKeyToStoreKey(ctx context.Context, k client.ObjectKey) string {
+	cluster, ok := kcpclient.ClusterFromContext(ctx)
+	if ok {
+		return kcpcache.ToClusterAwareKey(cluster.String(), k.Namespace, k.Name)
+	}
+
+	if k.Namespace == "" {
+		return k.Name
+	}
+	return k.Namespace + "/" + k.Name
 }
 
 // requiresExactMatch checks if the given field selector is of the form `k=v` or `k==v`.
