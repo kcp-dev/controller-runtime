@@ -138,7 +138,12 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 		// namespace.
 		objs, err = c.indexer.ByIndex(FieldIndexName(field), KeyToNamespacedKey(listOpts.Namespace, val))
 	case listOpts.Cluster.Empty():
-		objs = c.indexer.List()
+		switch {
+		case listOpts.Namespace != "":
+			objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
+		default:
+			objs = c.indexer.List()
+		}
 	case listOpts.Namespace != "":
 		objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ToClusterAwareKey(listOpts.Cluster.String(), listOpts.Namespace, ""))
 	default:
