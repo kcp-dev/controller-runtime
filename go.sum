@@ -292,8 +292,8 @@ github.com/jstemmer/go-junit-report v0.9.1/go.mod h1:Brl9GWCQeLvo8nXZwPNNblvFj/X
 github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVYBRgL+9YlvaHOwJU=
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
-github.com/kcp-dev/apimachinery v0.0.0-20220518152549-f62703561e55 h1:nwrXHxVkTQ9BI6slgqWgg8CVC+7AbJR02byYq+iBOUg=
-github.com/kcp-dev/apimachinery v0.0.0-20220518152549-f62703561e55/go.mod h1:FIzhTU6DM3HYZhGv8w/1S/mbmSv1HzulZpjr/1/6i/I=
+github.com/kcp-dev/apimachinery v0.0.0-20220621200107-3d03cbbc3770 h1:vO2xIamfv7laTXwf8x+WZKugB1JTF62gHZgf+D0OY9E=
+github.com/kcp-dev/apimachinery v0.0.0-20220621200107-3d03cbbc3770/go.mod h1:FIzhTU6DM3HYZhGv8w/1S/mbmSv1HzulZpjr/1/6i/I=
 github.com/kcp-dev/logicalcluster v1.0.0 h1:qCnoUNaqJ0Tgefkj3vXn17EC76AP44WZwnIuHLw6yGQ=
 github.com/kcp-dev/logicalcluster v1.0.0/go.mod h1:M0CBFkJTW29XtIP5XIkDfhYQ8LU6HrnseRb4zmgBltE=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
