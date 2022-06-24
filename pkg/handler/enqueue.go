@@ -18,6 +18,7 @@ package handler
 
 import (
 	"github.com/kcp-dev/logicalcluster"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -79,7 +80,7 @@ func request(obj client.Object) reconcile.Request {
 	return reconcile.Request{
 		// TODO(kcp) Need to implement a non-kcp-specific way to support this
 		ClusterName: logicalcluster.From(obj).String(),
-		ObjectKey: client.ObjectKey{
+		NamespacedName: types.NamespacedName{
 			Namespace: obj.GetNamespace(),
 			Name:      obj.GetName(),
 		},
