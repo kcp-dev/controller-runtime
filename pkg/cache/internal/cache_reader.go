@@ -139,12 +139,18 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 		// namespaced index key.  Otherwise, ask for the non-namespaced variant by using the fake "all namespaces"
 		// namespace.
 		objs, err = c.indexer.ByIndex(FieldIndexName(field), KeyToNamespacedKey(listOpts.Namespace, val))
-	case listOpts.Cluster.Empty():
-		objs = c.indexer.List()
 	case listOpts.Namespace != "":
-		objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ToClusterAwareKey(listOpts.Cluster.String(), listOpts.Namespace, ""))
+		if listOpts.Cluster.Empty() {
+			objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
+		} else {
+			objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ToClusterAwareKey(listOpts.Cluster.String(), listOpts.Namespace, ""))
+		}
 	default:
-		objs, err = c.indexer.ByIndex(kcpcache.ClusterIndexName, kcpcache.ToClusterAwareKey(listOpts.Cluster.String(), "", ""))
+		if listOpts.Cluster.Empty() {
+			objs = c.indexer.List()
+		} else {
+			objs, err = c.indexer.ByIndex(kcpcache.ClusterIndexName, kcpcache.ToClusterAwareKey(listOpts.Cluster.String(), "", ""))
+		}
 	}
 	if err != nil {
 		return err
