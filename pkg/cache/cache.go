@@ -109,9 +109,9 @@ type Options struct {
 	// So that all informers will not send list requests simultaneously.
 	Resync *time.Duration
 
-	// KeyFunction is the cache.KeyFunc that the informers will be configured to use.
-	// Defaults to cache.MetaNamespaceKeyFunc from client-go
-	KeyFunction cache.KeyFunc
+	// NewInformerFunc is a function that is used to create SharedIndexInformers.
+	// Defaults to cache.NewSharedIndexInformer from client-go
+	NewInformerFunc client.NewInformerFunc
 
 	// Indexers is the indexers that the informers will be configured to use.
 	// Will always have the standard NamespaceIndex.
@@ -155,7 +155,7 @@ func New(config *rest.Config, opts Options) (Cache, error) {
 	if err != nil {
 		return nil, err
 	}
-	im := internal.NewInformersMap(config, opts.Scheme, opts.Mapper, *opts.Resync, opts.Namespace, selectorsByGVK, disableDeepCopyByGVK, opts.KeyFunction, opts.Indexers)
+	im := internal.NewInformersMap(config, opts.Scheme, opts.Mapper, *opts.Resync, opts.Namespace, selectorsByGVK, disableDeepCopyByGVK, opts.NewInformerFunc, opts.Indexers)
 	return &informerCache{InformersMap: im}, nil
 }
 
@@ -209,8 +209,8 @@ func defaultOpts(config *rest.Config, opts Options) (Options, error) {
 		opts.Resync = &defaultResyncTime
 	}
 
-	if opts.KeyFunction == nil {
-		opts.KeyFunction = cache.MetaNamespaceKeyFunc
+	if opts.NewInformerFunc == nil {
+		opts.NewInformerFunc = cache.NewSharedIndexInformer
 	}
 	return opts, nil
 }

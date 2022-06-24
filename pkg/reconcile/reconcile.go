@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // Result contains the result of a Reconciler invocation.
@@ -45,8 +45,12 @@ func (r *Result) IsZero() bool {
 // information to uniquely identify the object - its Name and Namespace.  It does NOT contain information about
 // any specific Event or the object contents itself.
 type Request struct {
-	// ObjectKey is the name, namespace, and cluster of the object to reconcile.
-	client.ObjectKey
+	// NamespacedName is the name and namespace of the object to reconcile.
+	types.NamespacedName
+
+	// ClusterName can be used for reconciling requests across multiple clusters,
+	// to prevent objects with the same name and namespace from conflicting
+	ClusterName string
 }
 
 /*

@@ -33,6 +33,7 @@ import (
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
+	"github.com/kcp-dev/apimachinery/third_party/informers"
 )
 
 // NewClusterAwareManager returns a kcp-aware manager with appropriate defaults for cache and
@@ -57,7 +58,8 @@ func NewClusterAwareManager(cfg *rest.Config, options ctrl.Options) (manager.Man
 func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 	c := rest.CopyConfig(config)
 	c.Host += "/clusters/*"
-	opts.KeyFunction = kcpcache.ClusterAwareKeyFunc
+	opts.NewInformerFunc = informers.NewSharedIndexInformer
+
 	opts.Indexers = k8scache.Indexers{
 		kcpcache.ClusterIndexName:             kcpcache.ClusterIndexFunc,
 		kcpcache.ClusterAndNamespaceIndexName: kcpcache.ClusterAndNamespaceIndexFunc,

@@ -253,7 +253,7 @@ func CreateCRDs(config *rest.Config, crds []*apiextensionsv1.CustomResourceDefin
 		crd := crd
 		log.V(1).Info("installing CRD", "crd", crd.GetName())
 		existingCrd := crd.DeepCopy()
-		err := cs.Get(context.TODO(), client.ObjectKey{NamespacedName: types.NamespacedName{Name: crd.GetName()}}, existingCrd)
+		err := cs.Get(context.TODO(), types.NamespacedName{Name: crd.GetName()}, existingCrd)
 		switch {
 		case apierrors.IsNotFound(err):
 			if err := cs.Create(context.TODO(), crd); err != nil {
@@ -264,7 +264,7 @@ func CreateCRDs(config *rest.Config, crds []*apiextensionsv1.CustomResourceDefin
 		default:
 			log.V(1).Info("CRD already exists, updating", "crd", crd.GetName())
 			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				if err := cs.Get(context.TODO(), client.ObjectKey{NamespacedName: types.NamespacedName{Name: crd.GetName()}}, existingCrd); err != nil {
+				if err := cs.Get(context.TODO(), types.NamespacedName{Name: crd.GetName()}, existingCrd); err != nil {
 					return err
 				}
 				crd.SetResourceVersion(existingCrd.GetResourceVersion())

@@ -18,10 +18,10 @@ package client
 
 import (
 	"context"
-
-	"github.com/kcp-dev/logicalcluster"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,15 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type ObjectKey struct {
-	types.NamespacedName
-
-	Cluster logicalcluster.Name
-}
+type ObjectKey = types.NamespacedName
 
 // ObjectKeyFromObject returns the ObjectKey given a runtime.Object.
 func ObjectKeyFromObject(obj Object) ObjectKey {
-	return ObjectKey{NamespacedName: types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, Cluster: logicalcluster.From(obj)}
+	return ObjectKey{Namespace: obj.GetNamespace(), Name: obj.GetName()}
 }
 
 // Patch is a patch that can be applied to a Kubernetes object.
@@ -47,6 +43,10 @@ type Patch interface {
 	// Data is the raw data representing the patch.
 	Data(obj Object) ([]byte, error)
 }
+
+// NewInformerFunc describes a function that creates SharedIndexInformers.
+// Its signature matches cache.NewSharedIndexInformer from client-go
+type NewInformerFunc func(cache.ListerWatcher, runtime.Object, time.Duration, cache.Indexers) cache.SharedIndexInformer
 
 // TODO(directxman12): is there a sane way to deal with get/delete options?
 

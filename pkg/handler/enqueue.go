@@ -77,11 +77,12 @@ func (e *EnqueueRequestForObject) Generic(evt event.GenericEvent, q workqueue.Ra
 }
 
 func request(obj client.Object) reconcile.Request {
-	return reconcile.Request{client.ObjectKey{
-		Cluster: logicalcluster.From(obj),
+	return reconcile.Request{
+		// TODO(kcp) Need to implement a non-kcp-specific way to support this
+		ClusterName: logicalcluster.From(obj).String(),
 		NamespacedName: types.NamespacedName{
 			Namespace: obj.GetNamespace(),
 			Name:      obj.GetName(),
 		},
-	}}
+	}
 }
