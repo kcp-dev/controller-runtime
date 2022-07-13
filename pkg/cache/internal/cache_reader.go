@@ -22,7 +22,7 @@ import (
 	"reflect"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
+	"github.com/kcp-dev/logicalcluster"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -121,7 +121,7 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 	// a wrapper that adds it from the context automatically rather than doing this?
 	// It may also make more sense to just use the context and not bother provided a ListOption for it
 	if listOpts.Cluster.Empty() {
-		if cluster, ok := kcpclient.ClusterFromContext(ctx); ok {
+		if cluster, ok := logicalcluster.ClusterFromContext(ctx); ok {
 			client.InCluster(cluster).ApplyToList(&listOpts)
 		}
 	}
@@ -203,7 +203,7 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 // String to allow keeping the key format easily in sync with
 // MetaNamespaceKeyFunc.
 func objectKeyToStoreKey(ctx context.Context, k client.ObjectKey) string {
-	cluster, ok := kcpclient.ClusterFromContext(ctx)
+	cluster, ok := logicalcluster.ClusterFromContext(ctx)
 	if ok {
 		return kcpcache.ToClusterAwareKey(cluster.String(), k.Namespace, k.Name)
 	}
