@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/logr v1.2.0
 	github.com/go-logr/zapr v1.2.0
 	github.com/kcp-dev/apimachinery v0.0.0-20220708220956-c302aeddfde7
-	github.com/kcp-dev/logicalcluster v1.1.1-0.20220705215104-8e46328c24a5
+	github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
 	github.com/prometheus/client_golang v1.11.0
