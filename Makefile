@@ -77,6 +77,9 @@ $(GOLANGCI_LINT): .github/workflows/golangci-lint.yml # Download golanci-lint us
 		-b $(TOOLS_BIN_DIR) \
 		$(shell cat .github/workflows/golangci-lint.yml | grep version | sed 's/.*version: //')
 
+.PHONY: tools
+tools: $(GO_APIDIFF) $(CONTROLLER_GEN) $(GOLANGCI_LINT)
+
 ## --------------------------------------
 ## Linting
 ## --------------------------------------
