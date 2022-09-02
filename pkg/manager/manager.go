@@ -234,6 +234,11 @@ type Options struct {
 	// by the manager. If not set this will use the default new cache function.
 	NewCache cache.NewCacheFunc
 
+	// NewAPIReaderFunc is the function that creates the APIReader client to be
+	// used by the manager. If not set this will use the default new APIReader
+	// function.
+	NewAPIReader cluster.NewAPIReaderFunc
+
 	// NewClient is the func that creates the client to be used by the manager.
 	// If not set this will create the default DelegatingClient that will
 	// use the cache for reads and the client for writes.
@@ -326,6 +331,7 @@ func New(config *rest.Config, options Options) (Manager, error) {
 		clusterOptions.SyncPeriod = options.SyncPeriod
 		clusterOptions.Namespace = options.Namespace
 		clusterOptions.NewCache = options.NewCache
+		clusterOptions.NewAPIReader = options.NewAPIReader
 		clusterOptions.NewClient = options.NewClient
 		clusterOptions.ClientDisableCacheFor = options.ClientDisableCacheFor
 		clusterOptions.DryRunClient = options.DryRunClient

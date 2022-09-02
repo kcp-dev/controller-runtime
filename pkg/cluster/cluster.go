@@ -109,6 +109,11 @@ type Options struct {
 	// by the manager. If not set this will use the default new cache function.
 	NewCache cache.NewCacheFunc
 
+	// NewAPIReaderFunc is the function that creates the APIReader client to be
+	// used by the manager. If not set this will use the default new APIReader
+	// function.
+	NewAPIReader NewAPIReaderFunc
+
 	// NewClient is the func that creates the client to be used by the manager.
 	// If not set this will create the default DelegatingClient that will
 	// use the cache for reads and the client for writes.
@@ -169,7 +174,7 @@ func New(config *rest.Config, opts ...Option) (Cluster, error) {
 
 	clientOptions := client.Options{Scheme: options.Scheme, Mapper: mapper}
 
-	apiReader, err := client.New(config, clientOptions)
+	apiReader, err := options.NewAPIReader(config, clientOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -215,6 +220,10 @@ func setOptionsDefaults(options Options) Options {
 		options.MapperProvider = func(c *rest.Config) (meta.RESTMapper, error) {
 			return apiutil.NewDynamicRESTMapper(c)
 		}
+	}
+
+	if options.NewAPIReader == nil {
+		options.NewAPIReader = DefaultNewAPIReader
 	}
 
 	// Allow users to define how to create a new client
@@ -267,4 +276,12 @@ func DefaultNewClient(cache cache.Cache, config *rest.Config, options client.Opt
 		Client:          c,
 		UncachedObjects: uncachedObjects,
 	})
+}
+
+// NewAPIReaderFunc allows a user to define how to create an API server client.
+type NewAPIReaderFunc func(config *rest.Config, options client.Options) (client.Reader, error)
+
+// DefaultNewAPIReader creates the default API server client.
+func DefaultNewAPIReader(config *rest.Config, options client.Options) (client.Reader, error) {
+	return client.New(config, options)
 }
