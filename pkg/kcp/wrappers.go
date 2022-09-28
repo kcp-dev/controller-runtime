@@ -136,3 +136,32 @@ func NewClusterAwareMapperProvider(c *rest.Config) (meta.RESTMapper, error) {
 
 	return apiutil.NewDynamicRESTMapper(mapperCfg)
 }
+
+// ClusterAwareBuilderWithOptions returns a cluster aware Cache constructor that will build
+// a cache honoring the options argument, this is useful to specify options like
+// SelectorsByObject
+// WARNING: If SelectorsByObject is specified, filtered out resources are not
+// returned.
+// WARNING: If UnsafeDisableDeepCopy is enabled, you must DeepCopy any object
+// returned from cache get/list before mutating it.
+func ClusterAwareBuilderWithOptions(options cache.Options) cache.NewCacheFunc {
+	return func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+		if options.Scheme == nil {
+			options.Scheme = opts.Scheme
+		}
+		if options.Mapper == nil {
+			options.Mapper = opts.Mapper
+		}
+		if options.Resync == nil {
+			options.Resync = opts.Resync
+		}
+		if options.Namespace == "" {
+			options.Namespace = opts.Namespace
+		}
+		if opts.Resync == nil {
+			opts.Resync = options.Resync
+		}
+
+		return NewClusterAwareCache(config, options)
+	}
+}
