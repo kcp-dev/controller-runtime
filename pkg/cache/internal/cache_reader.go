@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"reflect"
 
-	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	"github.com/kcp-dev/logicalcluster/v2"
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -132,13 +132,13 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 		if clusterName.Empty() {
 			objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
 		} else {
-			objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ToClusterAwareKey(clusterName.String(), listOpts.Namespace, ""))
+			objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ClusterAndNamespaceIndexKey(clusterName, listOpts.Namespace))
 		}
 	default:
 		if clusterName.Empty() {
 			objs = c.indexer.List()
 		} else {
-			objs, err = c.indexer.ByIndex(kcpcache.ClusterIndexName, kcpcache.ToClusterAwareKey(clusterName.String(), "", ""))
+			objs, err = c.indexer.ByIndex(kcpcache.ClusterIndexName, kcpcache.ClusterIndexKey(clusterName))
 		}
 	}
 	if err != nil {

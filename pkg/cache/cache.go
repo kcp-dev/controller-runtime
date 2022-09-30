@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/kcp-dev/apimachinery/v2/third_party/informers"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -431,7 +432,7 @@ func defaultOpts(config *rest.Config, opts Options) (Options, error) {
 	}
 
 	if opts.NewInformerFunc == nil {
-		opts.NewInformerFunc = toolscache.NewSharedIndexInformer
+		opts.NewInformerFunc = informers.NewSharedIndexInformer
 	}
 	return opts, nil
 }

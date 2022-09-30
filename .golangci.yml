@@ -56,7 +56,10 @@ linters-settings:
     go: "1.19"
   stylecheck:
     go: "1.19"
+  nolintlint:
+    allow-unused: true # required since go 1.18
   depguard:
+    list-type: denylist # required since go 1.18
     include-go-root: true
     packages:
       - io/ioutil # https://go.dev/doc/go1.16#ioutil
