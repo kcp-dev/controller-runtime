@@ -116,6 +116,34 @@ func NewClusterAwareClient(cache cache.Cache, config *rest.Config, opts client.O
 	return cluster.DefaultNewClient(cache, config, opts, uncachedObjects...)
 }
 
+// NewClusterAwareClientForConfig returns a client.Client that is configured to use the context to scope
+// requests to the proper cluster. To scope requests, pass the request context with the cluster set.
+// Example:
+//	import (
+//		"context"
+//		kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
+//		ctrl "sigs.k8s.io/controller-runtime"
+//	)
+//	func (r *reconciler)  Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+//		ctx = kcpclient.WithCluster(ctx, req.ObjectKey.Cluster)
+//		// from here on pass this context to all client calls
+//		...
+//	}
+func NewClusterAwareClientForConfig(config *rest.Config) (client.Client, error) {
+	httpClient, err := ClusterAwareHTTPClient(config)
+	if err != nil {
+		return nil, err
+	}
+	restMapper, err := NewClusterAwareMapperProvider(config)
+	if err != nil {
+		return nil, err
+	}
+	return client.New(config, client.Options{
+		Mapper:     restMapper,
+		HTTPClient: httpClient,
+	})
+}
+
 // ClusterAwareHTTPClient returns an http.Client with a cluster aware round tripper.
 func ClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
 	httpClient, err := rest.HTTPClientFor(config)
