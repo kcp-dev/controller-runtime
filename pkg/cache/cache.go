@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kcp-dev/apimachinery/third_party/informers"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -226,7 +227,7 @@ func defaultOpts(config *rest.Config, opts Options) (Options, error) {
 	}
 
 	if opts.NewInformerFunc == nil {
-		opts.NewInformerFunc = toolscache.NewSharedIndexInformer
+		opts.NewInformerFunc = informers.NewSharedIndexInformer
 	}
 	return opts, nil
 }
