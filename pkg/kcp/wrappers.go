@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
-	"github.com/kcp-dev/apimachinery/third_party/informers"
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
+	"github.com/kcp-dev/apimachinery/v2/third_party/informers"
 )
 
 // NewClusterAwareManager returns a kcp-aware manager with appropriate defaults for cache and
@@ -75,9 +75,10 @@ func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache,
 // and is configured to use the context to scope requests to the proper cluster. To scope requests,
 // pass the request context with the cluster set.
 // Example:
+//
 //	import (
 //		"context"
-//		kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
+//		kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
 //		ctrl "sigs.k8s.io/controller-runtime"
 //	)
 //	func (r *reconciler)  Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -97,9 +98,10 @@ func NewClusterAwareAPIReader(config *rest.Config, opts client.Options) (client.
 // NewClusterAwareClient returns a client.Client that is configured to use the context
 // to scope requests to the proper cluster. To scope requests, pass the request context with the cluster set.
 // Example:
+//
 //	import (
 //		"context"
-//		kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
+//		kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
 //		ctrl "sigs.k8s.io/controller-runtime"
 //	)
 //	func (r *reconciler)  Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -119,9 +121,10 @@ func NewClusterAwareClient(cache cache.Cache, config *rest.Config, opts client.O
 // NewClusterAwareClientForConfig returns a client.Client that is configured to use the context to scope
 // requests to the proper cluster. To scope requests, pass the request context with the cluster set.
 // Example:
+//
 //	import (
 //		"context"
-//		kcpclient "github.com/kcp-dev/apimachinery/pkg/client"
+//		kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
 //		ctrl "sigs.k8s.io/controller-runtime"
 //	)
 //	func (r *reconciler)  Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
