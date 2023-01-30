@@ -24,6 +24,14 @@
 SHELL:=/usr/bin/env bash
 .DEFAULT_GOAL:=help
 
+#-----------------------------------------------------------------------------
+# Workaround git issues on OpenShift Prow CI, where the user running in the
+# job is not guaranteed to own the repo checkout.
+#-----------------------------------------------------------------------------
+ifeq ($(CI),true)
+   $(shell git config --global --add safe.directory '*')
+endif
+
 # Use GOPROXY environment variable if set
 GOPROXY := $(shell go env GOPROXY)
 ifeq ($(GOPROXY),)
