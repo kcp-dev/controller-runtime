@@ -17,7 +17,9 @@ limitations under the License.
 package kcp
 
 import (
+	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,6 +36,7 @@ import (
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 	kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
 	"github.com/kcp-dev/apimachinery/v2/third_party/informers"
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 // NewClusterAwareManager returns a kcp-aware manager with appropriate defaults for cache and
@@ -55,6 +58,9 @@ func NewClusterAwareManager(cfg *rest.Config, options ctrl.Options) (manager.Man
 		options.MapperProvider = NewClusterAwareMapperProvider
 	}
 
+	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return newClusterRoundTripper(rt)
+	})
 	return ctrl.NewManager(cfg, options)
 }
 
@@ -195,4 +201,51 @@ func ClusterAwareBuilderWithOptions(options cache.Options) cache.NewCacheFunc {
 
 		return NewClusterAwareCache(config, options)
 	}
+}
+
+// clusterRoundTripper is a cluster aware wrapper around http.RoundTripper.
+type clusterRoundTripper struct {
+	delegate http.RoundTripper
+}
+
+// newClusterRoundTripper creates a new cluster aware round tripper.
+func newClusterRoundTripper(delegate http.RoundTripper) *clusterRoundTripper {
+	return &clusterRoundTripper{
+		delegate: delegate,
+	}
+}
+
+func (c *clusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	cluster, ok := ClusterFromContext(req.Context())
+	if ok {
+		req = req.Clone(req.Context())
+		req.URL.Path = generatePath(req.URL.Path, cluster.Path())
+		req.URL.RawPath = generatePath(req.URL.RawPath, cluster.Path())
+	}
+	return c.delegate.RoundTrip(req)
+}
+
+// apiRegex matches any string that has /api/ or /apis/ in it.
+var apiRegex = regexp.MustCompile(`(/api/|/apis/)`)
+
+// generatePath formats the request path to target the specified cluster.
+func generatePath(originalPath string, clusterPath logicalcluster.Path) string {
+	// If the originalPath already has cluster.Path() then the path was already modifed and no change needed
+	if strings.Contains(originalPath, clusterPath.RequestPath()) {
+		return originalPath
+	}
+	// If the originalPath has /api/ or /apis/ in it, it might be anywhere in the path, so we use a regex to find and
+	// replaces /api/ or /apis/ with $cluster/api/ or $cluster/apis/
+	if apiRegex.MatchString(originalPath) {
+		return apiRegex.ReplaceAllString(originalPath, fmt.Sprintf("%s$1", clusterPath.RequestPath()))
+	}
+	// Otherwise, we're just prepending /clusters/$name
+	path := clusterPath.RequestPath()
+	// if the original path is relative, add a / separator
+	if len(originalPath) > 0 && originalPath[0] != '/' {
+		path += "/"
+	}
+	// finally append the original path
+	path += originalPath
+	return path
 }
