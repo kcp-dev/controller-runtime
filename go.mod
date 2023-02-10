@@ -7,8 +7,8 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v1.2.0
-	github.com/kcp-dev/apimachinery/v2 v2.0.0-alpha.0
-	github.com/kcp-dev/logicalcluster/v3 v3.0.2
+	github.com/kcp-dev/apimachinery/v2 v2.0.0-alpha.0.0.20230113171111-a259d60637ec
+	github.com/kcp-dev/logicalcluster/v3 v3.0.4
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.22.1
 	github.com/prometheus/client_golang v1.14.0
