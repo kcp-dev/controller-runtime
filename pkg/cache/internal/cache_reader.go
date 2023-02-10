@@ -22,7 +22,6 @@ import (
 	"reflect"
 
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
-	"github.com/kcp-dev/logicalcluster/v3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -33,6 +32,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/internal/field/selector"
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
 // CacheReader is a client.Reader.
@@ -114,7 +114,7 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 	listOpts := client.ListOptions{}
 	listOpts.ApplyOptions(opts)
 
-	clusterName, _ := logicalcluster.ClusterFromContext(ctx)
+	clusterName, _ := kontext.ClusterFrom(ctx)
 
 	switch {
 	case listOpts.FieldSelector != nil:
@@ -192,7 +192,7 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 // String to allow keeping the key format easily in sync with
 // MetaNamespaceKeyFunc.
 func objectKeyToStoreKey(ctx context.Context, k client.ObjectKey) string {
-	cluster, ok := logicalcluster.ClusterFromContext(ctx)
+	cluster, ok := kontext.ClusterFrom(ctx)
 	if ok {
 		return kcpcache.ToClusterAwareKey(cluster.String(), k.Namespace, k.Name)
 	}

@@ -31,10 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
-	kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
 	"github.com/kcp-dev/apimachinery/v2/third_party/informers"
 	"github.com/kcp-dev/logicalcluster/v3"
 )
@@ -160,7 +160,7 @@ func ClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
 		return nil, err
 	}
 
-	httpClient.Transport = kcpclient.NewClusterRoundTripper(httpClient.Transport)
+	httpClient.Transport = newClusterRoundTripper(httpClient.Transport)
 	return httpClient, nil
 }
 
@@ -216,7 +216,7 @@ func newClusterRoundTripper(delegate http.RoundTripper) *clusterRoundTripper {
 }
 
 func (c *clusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	cluster, ok := ClusterFromContext(req.Context())
+	cluster, ok := kontext.ClusterFrom(req.Context())
 	if ok {
 		req = req.Clone(req.Context())
 		req.URL.Path = generatePath(req.URL.Path, cluster.Path())
