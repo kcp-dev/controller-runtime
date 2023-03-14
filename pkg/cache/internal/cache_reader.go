@@ -128,7 +128,11 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 		// list all objects by the field selector.  If this is namespaced and we have one, ask for the
 		// namespaced index key.  Otherwise, ask for the non-namespaced variant by using the fake "all namespaces"
 		// namespace.
-		objs, err = c.indexer.ByIndex(FieldIndexName(field), KeyToNamespacedKey(listOpts.Namespace, val))
+		if clusterName.Empty() {
+			objs, err = c.indexer.ByIndex(FieldIndexName(field), KeyToNamespacedKey(listOpts.Namespace, val))
+		} else {
+			objs, err = c.indexer.ByIndex(FieldIndexName(field), KeyToClusteredKey(clusterName.String(), listOpts.Namespace, val))
+		}
 	case listOpts.Namespace != "":
 		if clusterName.Empty() {
 			objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
@@ -233,4 +237,10 @@ func KeyToNamespacedKey(ns string, baseKey string) string {
 		return ns + "/" + baseKey
 	}
 	return allNamespacesNamespace + "/" + baseKey
+}
+
+// KeyToClusteredKey prefixes the given index key with a cluster name
+// for use in field selector indexes.
+func KeyToClusteredKey(clusterName string, ns string, baseKey string) string {
+	return clusterName + "/" + KeyToNamespacedKey(ns, baseKey)
 }
