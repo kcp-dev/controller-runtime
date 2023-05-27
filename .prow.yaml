@@ -1,0 +1,15 @@
+presubmits:
+  - name: pull-controller-runtime-everything
+    always_run: true
+    decorate: true
+    clone_uri: "ssh://git@github.com/kcp-dev/controller-runtime.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        # TODO(MadhavJivrajani): Change the following to the kcp-dev/build image once it is available
+        # Ref: https://github.com/kcp-dev/infra/pull/34
+        - image: quay.io/kubermatic/build:go-1.20-node-18-6
+          command:
+            - make
+            - test
