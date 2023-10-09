@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -169,6 +170,10 @@ type Options struct {
 	// recommend the `Reconcile` function return `reconcile.Result{RequeueAfter: t}`,
 	// instead of `reconcile.Result{}`.
 	SyncPeriod *time.Duration
+
+	// Indexers is the indexers that the informers will be configured to use.
+	// Will always have the standard NamespaceIndex.
+	Indexers toolscache.Indexers
 
 	// ReaderFailOnMissingInformer configures the cache to return a ErrResourceNotCached error when a user
 	// requests, using Get() and List(), a resource the cache does not already have an informer for.
@@ -436,6 +441,7 @@ func newCache(restConfig *rest.Config, opts Options) newCacheFunc {
 				NewInformer:           opts.NewInformer,
 			}),
 			readerFailOnMissingInformer: opts.ReaderFailOnMissingInformer,
+			clusterIndexes:              strings.HasSuffix(restConfig.Host, "/clusters/*"),
 		}
 	}
 }
@@ -545,6 +551,10 @@ func defaultOpts(config *rest.Config, opts Options) (Options, error) {
 	// Default the resync period to 10 hours if unset
 	if opts.SyncPeriod == nil {
 		opts.SyncPeriod = &defaultSyncPeriod
+	}
+
+	if opts.NewInformer == nil {
+		opts.NewInformer = toolscache.NewSharedIndexInformer
 	}
 	return opts, nil
 }

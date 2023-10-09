@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"reflect"
 
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
@@ -31,6 +34,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/internal/field/selector"
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
 // CacheReader is a client.Reader.
@@ -54,11 +58,21 @@ type CacheReader struct {
 }
 
 // Get checks the indexer for the object and writes a copy of it if found.
-func (c *CacheReader) Get(_ context.Context, key client.ObjectKey, out client.Object, _ ...client.GetOption) error {
+func (c *CacheReader) Get(ctx context.Context, key client.ObjectKey, out client.Object, _ ...client.GetOption) error {
 	if c.scopeName == apimeta.RESTScopeNameRoot {
 		key.Namespace = ""
 	}
 	storeKey := objectKeyToStoreKey(key)
+
+	// create cluster-aware key for KCP
+	_, isClusterAware := c.indexer.GetIndexers()[kcpcache.ClusterAndNamespaceIndexName]
+	clusterName, _ := kontext.ClusterFrom(ctx)
+	if isClusterAware && clusterName.Empty() {
+		return fmt.Errorf("cluster-aware cache requires a cluster in context")
+	}
+	if isClusterAware {
+		storeKey = clusterName.String() + "|" + storeKey
+	}
 
 	// Lookup the object from the indexer cache
 	obj, exists, err := c.indexer.GetByKey(storeKey)
@@ -105,7 +119,7 @@ func (c *CacheReader) Get(_ context.Context, key client.ObjectKey, out client.Ob
 }
 
 // List lists items out of the indexer and writes them to out.
-func (c *CacheReader) List(_ context.Context, out client.ObjectList, opts ...client.ListOption) error {
+func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...client.ListOption) error {
 	var objs []interface{}
 	var err error
 
@@ -116,6 +130,9 @@ func (c *CacheReader) List(_ context.Context, out client.ObjectList, opts ...cli
 		return fmt.Errorf("continue list option is not supported by the cache")
 	}
 
+	_, isClusterAware := c.indexer.GetIndexers()[kcpcache.ClusterAndNamespaceIndexName]
+	clusterName, _ := kontext.ClusterFrom(ctx)
+
 	switch {
 	case listOpts.FieldSelector != nil:
 		requiresExact := selector.RequiresExactMatch(listOpts.FieldSelector)
@@ -125,11 +142,19 @@ func (c *CacheReader) List(_ context.Context, out client.ObjectList, opts ...cli
 		// list all objects by the field selector. If this is namespaced and we have one, ask for the
 		// namespaced index key. Otherwise, ask for the non-namespaced variant by using the fake "all namespaces"
 		// namespace.
-		objs, err = byIndexes(c.indexer, listOpts.FieldSelector.Requirements(), listOpts.Namespace)
+		objs, err = byIndexes(c.indexer, listOpts.FieldSelector.Requirements(), clusterName, listOpts.Namespace)
 	case listOpts.Namespace != "":
-		objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
+		if isClusterAware && !clusterName.Empty() {
+			objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ClusterAndNamespaceIndexKey(clusterName, listOpts.Namespace))
+		} else {
+			objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
+		}
 	default:
-		objs = c.indexer.List()
+		if isClusterAware && !clusterName.Empty() {
+			objs, err = c.indexer.ByIndex(kcpcache.ClusterIndexName, kcpcache.ClusterIndexKey(clusterName))
+		} else {
+			objs = c.indexer.List()
+		}
 	}
 	if err != nil {
 		return err
@@ -177,16 +202,22 @@ func (c *CacheReader) List(_ context.Context, out client.ObjectList, opts ...cli
 	return apimeta.SetList(out, runtimeObjs)
 }
 
-func byIndexes(indexer cache.Indexer, requires fields.Requirements, namespace string) ([]interface{}, error) {
+func byIndexes(indexer cache.Indexer, requires fields.Requirements, clusterName logicalcluster.Name, namespace string) ([]interface{}, error) {
 	var (
 		err  error
 		objs []interface{}
 		vals []string
 	)
 	indexers := indexer.GetIndexers()
+	_, isClusterAware := indexers[kcpcache.ClusterAndNamespaceIndexName]
 	for idx, req := range requires {
 		indexName := FieldIndexName(req.Field)
-		indexedValue := KeyToNamespacedKey(namespace, req.Value)
+		var indexedValue string
+		if isClusterAware {
+			indexedValue = KeyToClusteredKey(clusterName.String(), namespace, req.Value)
+		} else {
+			indexedValue = KeyToNamespacedKey(namespace, req.Value)
+		}
 		if idx == 0 {
 			// we use first require to get snapshot data
 			// TODO(halfcrazy): use complicated index when client-go provides byIndexes
@@ -252,4 +283,10 @@ func KeyToNamespacedKey(ns string, baseKey string) string {
 		return ns + "/" + baseKey
 	}
 	return allNamespacesNamespace + "/" + baseKey
+}
+
+// KeyToClusteredKey prefixes the given index key with a cluster name
+// for use in field selector indexes.
+func KeyToClusteredKey(clusterName string, ns string, baseKey string) string {
+	return clusterName + "|" + KeyToNamespacedKey(ns, baseKey)
 }

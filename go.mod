@@ -32,6 +32,11 @@ require (
 )
 
 require (
+	github.com/kcp-dev/apimachinery/v2 v2.0.0
+	github.com/kcp-dev/logicalcluster/v3 v3.0.5
+)
+
+require (
 	cel.dev/expr v0.18.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
