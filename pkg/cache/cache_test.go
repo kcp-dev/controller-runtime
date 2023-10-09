@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -545,13 +546,13 @@ func NonBlockingGetTest(createCacheFunc func(config *rest.Config, opts cache.Opt
 
 			By("creating the informer cache")
 			v := reflect.ValueOf(&opts).Elem()
-			newInformerField := v.FieldByName("newInformer")
-			newFakeInformer := func(_ kcache.ListerWatcher, _ runtime.Object, _ time.Duration, _ kcache.Indexers) kcache.SharedIndexInformer {
+			newInformerField := v.FieldByName("NewInformerFunc")
+			newFakeInformer := func(_ kcache.ListerWatcher, _ runtime.Object, _ time.Duration, _ kcache.Indexers) kcpcache.ScopeableSharedIndexInformer {
 				return &controllertest.FakeInformer{Synced: false}
 			}
 			reflect.NewAt(newInformerField.Type(), newInformerField.Addr().UnsafePointer()).
 				Elem().
-				Set(reflect.ValueOf(&newFakeInformer))
+				Set(reflect.ValueOf(newFakeInformer))
 			informerCache, err = createCacheFunc(cfg, opts)
 			Expect(err).NotTo(HaveOccurred())
 			By("running the cache and waiting for it to sync")

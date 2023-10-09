@@ -89,6 +89,14 @@ type CacheOptions struct {
 // NewClientFunc allows a user to define how to create a client.
 type NewClientFunc func(config *rest.Config, options Options) (Client, error)
 
+// NewAPIReaderFunc allows a user to define how to create an API server reader.
+type NewAPIReaderFunc func(config *rest.Config, options Options) (Reader, error)
+
+// NewAPIReader creates a new API server reader.
+func NewAPIReader(config *rest.Config, options Options) (Reader, error) {
+	return New(config, options)
+}
+
 // New returns a new Client using the provided config and Options.
 // The returned client reads *and* writes directly from the server
 // (it doesn't use object caches).  It understands how to work with
