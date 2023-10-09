@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	"github.com/kcp-dev/apimachinery/v2/third_party/informers"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +48,7 @@ type InformersOpts struct {
 	Mapper                meta.RESTMapper
 	ResyncPeriod          time.Duration
 	Namespace             string
-	NewInformer           *func(cache.ListerWatcher, runtime.Object, time.Duration, cache.Indexers) cache.SharedIndexInformer
+	NewInformer           func(cache.ListerWatcher, runtime.Object, time.Duration, cache.Indexers) kcpcache.ScopeableSharedIndexInformer
 	Selector              Selector
 	Transform             cache.TransformFunc
 	UnsafeDisableDeepCopy bool
@@ -55,9 +57,9 @@ type InformersOpts struct {
 
 // NewInformers creates a new InformersMap that can create informers under the hood.
 func NewInformers(config *rest.Config, options *InformersOpts) *Informers {
-	newInformer := cache.NewSharedIndexInformer
+	newInformer := informers.NewSharedIndexInformer
 	if options.NewInformer != nil {
-		newInformer = *options.NewInformer
+		newInformer = options.NewInformer
 	}
 	return &Informers{
 		config:     config,
@@ -175,7 +177,7 @@ type Informers struct {
 	unsafeDisableDeepCopy bool
 
 	// NewInformer allows overriding of the shared index informer constructor for testing.
-	newInformer func(cache.ListerWatcher, runtime.Object, time.Duration, cache.Indexers) cache.SharedIndexInformer
+	newInformer func(cache.ListerWatcher, runtime.Object, time.Duration, cache.Indexers) kcpcache.ScopeableSharedIndexInformer
 
 	// WatchErrorHandler allows the shared index informer's
 	// watchErrorHandler to be set by overriding the options

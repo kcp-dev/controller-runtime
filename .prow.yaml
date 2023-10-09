@@ -1,0 +1,13 @@
+presubmits:
+  - name: pull-controller-runtime-everything
+    always_run: true
+    decorate: true
+    clone_uri: "ssh://git@github.com/kcp-dev/controller-runtime.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: ghcr.io/kcp-dev/infra/build:1.20.9-1
+          command:
+            - make
+            - test
