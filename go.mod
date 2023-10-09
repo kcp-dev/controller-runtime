@@ -3,6 +3,7 @@ module sigs.k8s.io/controller-runtime
 go 1.22.0
 
 require (
+	github.com/evanphx/json-patch v5.6.0+incompatible // Using v4 to match upstream
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-logr/logr v1.4.2

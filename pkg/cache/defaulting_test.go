@@ -401,6 +401,9 @@ func TestDefaultOpts(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			// We cannot reference kcp.NewInformerWithClusterIndexes due to import cycle.
+			defaulted.NewInformerFunc = nil
+
 			if diff := tc.verification(defaulted); diff != "" {
 				t.Errorf("expected config differs from actual: %s", diff)
 			}
