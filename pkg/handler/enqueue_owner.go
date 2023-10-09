@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -181,9 +183,12 @@ func (e *enqueueRequestForOwner[T]) getOwnerReconcileRequest(object metav1.Objec
 		// object in the event.
 		if ref.Kind == e.groupKind.Kind && refGV.Group == e.groupKind.Group {
 			// Match found - add a Request for the object referred to in the OwnerReference
-			request := reconcile.Request{NamespacedName: types.NamespacedName{
-				Name: ref.Name,
-			}}
+			request := reconcile.Request{
+				ClusterName: logicalcluster.From(object).String(),
+				NamespacedName: types.NamespacedName{
+					Name: ref.Name,
+				},
+			}
 
 			// if owner is not namespaced then we should not set the namespace
 			mapping, err := e.mapper.RESTMapping(e.groupKind, refGV.Version)

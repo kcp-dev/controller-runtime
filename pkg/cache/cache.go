@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -169,6 +170,14 @@ type Options struct {
 	// instead of `reconcile.Result{}`.
 	SyncPeriod *time.Duration
 
+	// NewInformerFunc is a function that is used to create SharedIndexInformers.
+	// Defaults to cache.NewSharedIndexInformer from client-go
+	NewInformerFunc client.NewInformerFunc
+
+	// Indexers is the indexers that the informers will be configured to use.
+	// Will always have the standard NamespaceIndex.
+	Indexers toolscache.Indexers
+
 	// ReaderFailOnMissingInformer configures the cache to return a ErrResourceNotCached error when a user
 	// requests, using Get() and List(), a resource the cache does not already have an informer for.
 	//
@@ -225,9 +234,6 @@ type Options struct {
 	// ByObject restricts the cache's ListWatch to the desired fields per GVK at the specified object.
 	// If unset, this will fall through to the Default* settings.
 	ByObject map[client.Object]ByObject
-
-	// newInformer allows overriding of NewSharedIndexInformer for testing.
-	newInformer *func(toolscache.ListerWatcher, runtime.Object, time.Duration, toolscache.Indexers) toolscache.SharedIndexInformer
 }
 
 // ByObject offers more fine-grained control over the cache's ListWatch by object.
@@ -398,9 +404,10 @@ func newCache(restConfig *rest.Config, opts Options) newCacheFunc {
 				Transform:             config.Transform,
 				WatchErrorHandler:     opts.DefaultWatchErrorHandler,
 				UnsafeDisableDeepCopy: ptr.Deref(config.UnsafeDisableDeepCopy, false),
-				NewInformer:           opts.newInformer,
+				NewInformer:           opts.NewInformerFunc,
 			}),
 			readerFailOnMissingInformer: opts.ReaderFailOnMissingInformer,
+			clusterIndexes:              strings.HasSuffix(restConfig.Host, "/clusters/*"),
 		}
 	}
 }
@@ -506,6 +513,10 @@ func defaultOpts(config *rest.Config, opts Options) (Options, error) {
 	// Default the resync period to 10 hours if unset
 	if opts.SyncPeriod == nil {
 		opts.SyncPeriod = &defaultSyncPeriod
+	}
+
+	if opts.NewInformerFunc == nil {
+		opts.NewInformerFunc = toolscache.NewSharedIndexInformer
 	}
 	return opts, nil
 }
