@@ -19,11 +19,14 @@ package controllertest
 import (
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	"github.com/kcp-dev/logicalcluster/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
 var _ cache.SharedIndexInformer = &FakeInformer{}
+var _ kcpcache.ScopeableSharedIndexInformer = &FakeInformer{}
 
 // FakeInformer provides fake Informer functionality for testing.
 type FakeInformer struct {
@@ -76,6 +79,11 @@ func (e eventHandlerWrapper) OnDelete(obj interface{}) {
 		return
 	}
 	e.handler.(legacyResourceEventHandler).OnDelete(obj)
+}
+
+// Cluster returns the fake Informer.
+func (f *FakeInformer) Cluster(clusterName logicalcluster.Name) cache.SharedIndexInformer {
+	return f
 }
 
 // AddIndexers does nothing.  TODO(community): Implement this.

@@ -31,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache/internal"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 var (
@@ -222,6 +224,13 @@ func indexByField(informer Informer, field string, extractValue client.IndexerFu
 		}
 		ns := meta.GetNamespace()
 
+		keyFunc := internal.KeyToNamespacedKey
+		if clusterName := logicalcluster.From(obj); !clusterName.Empty() {
+			keyFunc = func(ns, val string) string {
+				return internal.KeyToClusteredKey(clusterName.String(), ns, val)
+			}
+		}
+
 		rawVals := extractValue(obj)
 		var vals []string
 		if ns == "" {
@@ -231,14 +240,15 @@ func indexByField(informer Informer, field string, extractValue client.IndexerFu
 			// if we need to add non-namespaced versions too, double the length
 			vals = make([]string, len(rawVals)*2)
 		}
+
 		for i, rawVal := range rawVals {
 			// save a namespaced variant, so that we can ask
 			// "what are all the object matching a given index *in a given namespace*"
-			vals[i] = internal.KeyToNamespacedKey(ns, rawVal)
+			vals[i] = keyFunc(ns, rawVal)
 			if ns != "" {
 				// if we have a namespace, also inject a special index key for listing
 				// regardless of the object namespace
-				vals[i+len(rawVals)] = internal.KeyToNamespacedKey("", rawVal)
+				vals[i+len(rawVals)] = keyFunc("", rawVal)
 			}
 		}
 

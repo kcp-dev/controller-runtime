@@ -120,6 +120,11 @@ type Options struct {
 	// Only use a custom NewCache if you know what you are doing.
 	NewCache cache.NewCacheFunc
 
+	// NewAPIReaderFunc is the function that creates the APIReader client to be
+	// used by the manager. If not set this will use the default new APIReader
+	// function.
+	NewAPIReader client.NewAPIReaderFunc
+
 	// Client is the client.Options that will be used to create the default Client.
 	// By default, the client will use the cache for reads and direct calls for writes.
 	Client client.Options
@@ -324,6 +329,7 @@ func New(config *rest.Config, options Options) (Manager, error) {
 		clusterOptions.MapperProvider = options.MapperProvider
 		clusterOptions.Logger = options.Logger
 		clusterOptions.NewCache = options.NewCache
+		clusterOptions.NewAPIReader = options.NewAPIReader
 		clusterOptions.NewClient = options.NewClient
 		clusterOptions.Cache = options.Cache
 		clusterOptions.Client = options.Client

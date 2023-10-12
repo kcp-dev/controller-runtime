@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kcp-dev/apimachinery/v2/third_party/informers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
@@ -159,6 +160,14 @@ type Options struct {
 	// instead of `reconcile.Result{}`.
 	SyncPeriod *time.Duration
 
+	// NewInformerFunc is a function that is used to create SharedIndexInformers.
+	// Defaults to cache.NewSharedIndexInformer from client-go
+	NewInformerFunc client.NewInformerFunc
+
+	// Indexers is the indexers that the informers will be configured to use.
+	// Will always have the standard NamespaceIndex.
+	Indexers toolscache.Indexers
+
 	// ReaderFailOnMissingInformer configures the cache to return a ErrResourceNotCached error when a user
 	// requests, using Get() and List(), a resource the cache does not already have an informer for.
 	//
@@ -201,9 +210,6 @@ type Options struct {
 	// ByObject restricts the cache's ListWatch to the desired fields per GVK at the specified object.
 	// object, this will fall through to Default* settings.
 	ByObject map[client.Object]ByObject
-
-	// newInformer allows overriding of NewSharedIndexInformer for testing.
-	newInformer *func(toolscache.ListerWatcher, runtime.Object, time.Duration, toolscache.Indexers) toolscache.SharedIndexInformer
 }
 
 // ByObject offers more fine-grained control over the cache's ListWatch by object.
@@ -354,7 +360,7 @@ func newCache(restConfig *rest.Config, opts Options) newCacheFunc {
 				},
 				Transform:             config.Transform,
 				UnsafeDisableDeepCopy: pointer.BoolDeref(config.UnsafeDisableDeepCopy, false),
-				NewInformer:           opts.newInformer,
+				NewInformer:           opts.NewInformerFunc,
 			}),
 			readerFailOnMissingInformer: opts.ReaderFailOnMissingInformer,
 		}
@@ -437,6 +443,10 @@ func defaultOpts(config *rest.Config, opts Options) (Options, error) {
 	// Default the resync period to 10 hours if unset
 	if opts.SyncPeriod == nil {
 		opts.SyncPeriod = &defaultSyncPeriod
+	}
+
+	if opts.NewInformerFunc == nil {
+		opts.NewInformerFunc = informers.NewSharedIndexInformer
 	}
 	return opts, nil
 }
