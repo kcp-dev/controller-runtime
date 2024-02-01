@@ -51,6 +51,7 @@ type InformersOpts struct {
 	Selector              Selector
 	Transform             cache.TransformFunc
 	UnsafeDisableDeepCopy bool
+	Indexers              cache.Indexers
 }
 
 // NewInformers creates a new InformersMap that can create informers under the hood.
@@ -78,6 +79,7 @@ func NewInformers(config *rest.Config, options *InformersOpts) *Informers {
 		transform:             options.Transform,
 		unsafeDisableDeepCopy: options.UnsafeDisableDeepCopy,
 		newInformer:           newInformer,
+		indexers:              options.Indexers,
 	}
 }
 
@@ -154,6 +156,9 @@ type Informers struct {
 	// namespace is the namespace that all ListWatches are restricted to
 	// default or empty string means all namespaces
 	namespace string
+
+	// indexers is a list of additional indexers to use when creating a new informer
+	indexers cache.Indexers
 
 	selector              Selector
 	transform             cache.TransformFunc
@@ -311,6 +316,16 @@ func (ip *Informers) addInformerToMap(gvk schema.GroupVersionKind, obj runtime.O
 	if err != nil {
 		return nil, false, err
 	}
+
+	indexers := cache.Indexers{
+		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+	}
+
+	// Append additional indexers that might be passed.
+	for key := range ip.indexers {
+		indexers[key] = ip.indexers[key]
+	}
+
 	sharedIndexInformer := ip.newInformer(&cache.ListWatch{
 		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 			ip.selector.ApplyToList(&opts)
@@ -321,9 +336,7 @@ func (ip *Informers) addInformerToMap(gvk schema.GroupVersionKind, obj runtime.O
 			opts.Watch = true // Watch needs to be set to true separately
 			return listWatcher.WatchFunc(opts)
 		},
-	}, obj, calculateResyncPeriod(ip.resync), cache.Indexers{
-		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
-	})
+	}, obj, calculateResyncPeriod(ip.resync), indexers)
 
 	// Check to see if there is a transformer for this gvk
 	if err := sharedIndexInformer.SetTransform(ip.transform); err != nil {
