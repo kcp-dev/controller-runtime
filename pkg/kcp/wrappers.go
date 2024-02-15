@@ -21,8 +21,10 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	k8scache "k8s.io/client-go/tools/cache"
 
@@ -67,12 +69,14 @@ func NewClusterAwareManager(cfg *rest.Config, options ctrl.Options) (manager.Man
 func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 	c := rest.CopyConfig(config)
 	c.Host += "/clusters/*"
-	opts.NewInformerFunc = informers.NewSharedIndexInformer
 
-	opts.Indexers = k8scache.Indexers{
-		kcpcache.ClusterIndexName:             kcpcache.ClusterIndexFunc,
-		kcpcache.ClusterAndNamespaceIndexName: kcpcache.ClusterAndNamespaceIndexFunc,
+	opts.NewInformerFunc = func(lw k8scache.ListerWatcher, obj runtime.Object, syncPeriod time.Duration, indexers k8scache.Indexers) kcpcache.ScopeableSharedIndexInformer {
+		indexers[kcpcache.ClusterIndexName] = kcpcache.ClusterIndexFunc
+		indexers[kcpcache.ClusterAndNamespaceIndexName] = kcpcache.ClusterAndNamespaceIndexFunc
+
+		return informers.NewSharedIndexInformer(lw, obj, syncPeriod, indexers)
 	}
+
 	return cache.New(c, opts)
 }
 
