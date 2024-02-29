@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	_ "github.com/onsi/ginkgo/v2"
 	gmg "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"

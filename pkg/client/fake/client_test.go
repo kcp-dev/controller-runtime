@@ -53,6 +53,11 @@ const (
 	cidrFromStatusUpdate      = "cidr-from-status-update"
 )
 
+const (
+	machineIDFromStatusUpdate = "machine-id-from-status-update"
+	cidrFromStatusUpdate      = "cidr-from-status-update"
+)
+
 var _ = Describe("Fake client", func() {
 	var dep *appsv1.Deployment
 	var dep2 *appsv1.Deployment
@@ -1610,6 +1615,7 @@ var _ = Describe("Fake client", func() {
 		Expect(objOriginal.Status.Phase).ToNot(Equal(actual.Status.Phase))
 	})
 
+<<<<<<< HEAD
 	It("should be able to change typed objects that have a scale subresource on patch", func() {
 		obj := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1632,6 +1638,9 @@ var _ = Describe("Fake client", func() {
 		Expect(cmp.Diff(objOriginal, actual)).To(BeEmpty())
 	})
 
+||||||| c20ea143
+=======
+>>>>>>> kcp-dev/kcp-1.28
 	It("should not change the status of typed objects that have a status subresource on patch", func() {
 		obj := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
