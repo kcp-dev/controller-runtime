@@ -251,7 +251,6 @@ func indexByField(informer Informer, field string, extractValue client.IndexerFu
 			// if we need to add non-namespaced versions too, double the length
 			vals = make([]string, len(rawVals)*2)
 		}
-
 		for i, rawVal := range rawVals {
 			// save a namespaced variant, so that we can ask
 			// "what are all the object matching a given index *in a given namespace*"

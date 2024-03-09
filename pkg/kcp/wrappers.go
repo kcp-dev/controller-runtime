@@ -19,9 +19,11 @@ package kcp
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
+	"unsafe"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,7 +68,10 @@ func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache,
 	c := rest.CopyConfig(config)
 	c.Host += "/clusters/*"
 
-	opts.NewInformerFunc = func(lw k8scache.ListerWatcher, obj runtime.Object, syncPeriod time.Duration, indexers k8scache.Indexers) kcpcache.ScopeableSharedIndexInformer {
+	type F func(k8scache.ListerWatcher, runtime.Object, time.Duration, k8scache.Indexers) k8scache.SharedIndexInformer
+	newInformerField := reflect.ValueOf(opts).Elem().FieldByName("newInformer")
+	fieldPointer := (*F)(unsafe.Pointer(newInformerField.UnsafeAddr())) // nolint:gosec // this is safe
+	*fieldPointer = func(lw k8scache.ListerWatcher, obj runtime.Object, syncPeriod time.Duration, indexers k8scache.Indexers) k8scache.SharedIndexInformer {
 		indexers[kcpcache.ClusterIndexName] = kcpcache.ClusterIndexFunc
 		indexers[kcpcache.ClusterAndNamespaceIndexName] = kcpcache.ClusterAndNamespaceIndexFunc
 
