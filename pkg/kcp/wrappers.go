@@ -47,10 +47,6 @@ func NewClusterAwareManager(cfg *rest.Config, options ctrl.Options) (manager.Man
 		options.NewCache = NewClusterAwareCache
 	}
 
-	if options.NewAPIReader == nil {
-		options.NewAPIReader = NewClusterAwareAPIReader
-	}
-
 	if options.NewClient == nil {
 		options.NewClient = NewClusterAwareClient
 	}
@@ -78,30 +74,6 @@ func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache,
 	}
 
 	return cache.New(c, opts)
-}
-
-// NewClusterAwareAPIReader returns a client.Reader that provides read-only access to the API server,
-// and is configured to use the context to scope requests to the proper cluster. To scope requests,
-// pass the request context with the cluster set.
-// Example:
-//
-//	import (
-//		"context"
-//		kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
-//		ctrl "sigs.k8s.io/controller-runtime"
-//	)
-//	func (r *reconciler)  Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-//		ctx = kcpclient.WithCluster(ctx, req.ObjectKey.Cluster)
-//		// from here on pass this context to all client calls
-//		...
-//	}
-func NewClusterAwareAPIReader(config *rest.Config, opts client.Options) (client.Reader, error) {
-	httpClient, err := ClusterAwareHTTPClient(config)
-	if err != nil {
-		return nil, err
-	}
-	opts.HTTPClient = httpClient
-	return client.NewAPIReader(config, opts)
 }
 
 // NewClusterAwareClient returns a client.Client that is configured to use the context
