@@ -132,9 +132,6 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 
 	_, isClusterAware := c.indexer.GetIndexers()[kcpcache.ClusterAndNamespaceIndexName]
 	clusterName, _ := kontext.ClusterFrom(ctx)
-	if isClusterAware && clusterName.Empty() {
-		return fmt.Errorf("cluster-aware cache requires a cluster in context")
-	}
 
 	switch {
 	case listOpts.FieldSelector != nil:
@@ -147,13 +144,13 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 		// namespace.
 		objs, err = byIndexes(c.indexer, listOpts.FieldSelector.Requirements(), clusterName, listOpts.Namespace)
 	case listOpts.Namespace != "":
-		if isClusterAware {
+		if isClusterAware && !clusterName.Empty() {
 			objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ClusterAndNamespaceIndexKey(clusterName, listOpts.Namespace))
 		} else {
 			objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
 		}
 	default:
-		if isClusterAware {
+		if isClusterAware && !clusterName.Empty() {
 			objs, err = c.indexer.ByIndex(kcpcache.ClusterIndexName, kcpcache.ClusterIndexKey(clusterName))
 		} else {
 			objs = c.indexer.List()
