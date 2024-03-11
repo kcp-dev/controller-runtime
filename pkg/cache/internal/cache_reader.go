@@ -62,7 +62,17 @@ func (c *CacheReader) Get(ctx context.Context, key client.ObjectKey, out client.
 	if c.scopeName == apimeta.RESTScopeNameRoot {
 		key.Namespace = ""
 	}
-	storeKey := objectKeyToStoreKey(ctx, key)
+	storeKey := objectKeyToStoreKey(key)
+
+	// create cluster-aware key for KCP
+	_, isClusterAware := c.indexer.GetIndexers()[kcpcache.ClusterAndNamespaceIndexName]
+	clusterName, _ := kontext.ClusterFrom(ctx)
+	if isClusterAware && clusterName.Empty() {
+		return fmt.Errorf("cluster-aware cache requires a cluster in context")
+	}
+	if isClusterAware {
+		storeKey = clusterName.String() + "|" + storeKey
+	}
 
 	// Lookup the object from the indexer cache
 	obj, exists, err := c.indexer.GetByKey(storeKey)
@@ -120,6 +130,7 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 		return fmt.Errorf("continue list option is not supported by the cache")
 	}
 
+	_, isClusterAware := c.indexer.GetIndexers()[kcpcache.ClusterAndNamespaceIndexName]
 	clusterName, _ := kontext.ClusterFrom(ctx)
 
 	switch {
@@ -133,16 +144,16 @@ func (c *CacheReader) List(ctx context.Context, out client.ObjectList, opts ...c
 		// namespace.
 		objs, err = byIndexes(c.indexer, listOpts.FieldSelector.Requirements(), clusterName, listOpts.Namespace)
 	case listOpts.Namespace != "":
-		if clusterName.Empty() {
-			objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
-		} else {
+		if isClusterAware && !clusterName.Empty() {
 			objs, err = c.indexer.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ClusterAndNamespaceIndexKey(clusterName, listOpts.Namespace))
+		} else {
+			objs, err = c.indexer.ByIndex(cache.NamespaceIndex, listOpts.Namespace)
 		}
 	default:
-		if clusterName.Empty() {
-			objs = c.indexer.List()
-		} else {
+		if isClusterAware && !clusterName.Empty() {
 			objs, err = c.indexer.ByIndex(kcpcache.ClusterIndexName, kcpcache.ClusterIndexKey(clusterName))
+		} else {
+			objs = c.indexer.List()
 		}
 	}
 	if err != nil {
@@ -198,13 +209,14 @@ func byIndexes(indexer cache.Indexer, requires fields.Requirements, clusterName 
 		vals []string
 	)
 	indexers := indexer.GetIndexers()
+	_, isClusterAware := indexers[kcpcache.ClusterAndNamespaceIndexName]
 	for idx, req := range requires {
 		indexName := FieldIndexName(req.Field)
 		var indexedValue string
-		if clusterName.Empty() {
-			indexedValue = KeyToNamespacedKey(namespace, req.Value)
-		} else {
+		if isClusterAware {
 			indexedValue = KeyToClusteredKey(clusterName.String(), namespace, req.Value)
+		} else {
+			indexedValue = KeyToNamespacedKey(namespace, req.Value)
 		}
 		if idx == 0 {
 			// we use first require to get snapshot data
@@ -248,12 +260,7 @@ func byIndexes(indexer cache.Indexer, requires fields.Requirements, clusterName 
 // It's akin to MetaNamespaceKeyFunc. It's separate from
 // String to allow keeping the key format easily in sync with
 // MetaNamespaceKeyFunc.
-func objectKeyToStoreKey(ctx context.Context, k client.ObjectKey) string {
-	cluster, ok := kontext.ClusterFrom(ctx)
-	if ok {
-		return kcpcache.ToClusterAwareKey(cluster.String(), k.Namespace, k.Name)
-	}
-
+func objectKeyToStoreKey(k client.ObjectKey) string {
 	if k.Namespace == "" {
 		return k.Name
 	}
