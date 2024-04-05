@@ -1,0 +1,14 @@
+apiVersion: tenancy.kcp.io/v1alpha1
+kind: Workspace
+metadata:
+  name: consumer2
+  annotations:
+    bootstrap.kcp.io/create-only: "true"
+spec:
+  type:
+    name: widgets
+    path: root
+  location:
+    selector:
+      matchLabels:
+        name: root

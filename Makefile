@@ -142,4 +142,6 @@ APIDIFF_OLD_COMMIT ?= $(shell git rev-parse origin/main)
 verify-apidiff: $(GO_APIDIFF) ## Check for API differences
 	$(GO_APIDIFF) $(APIDIFF_OLD_COMMIT) --print-compatible
 
-
+.PHONY: test-kcp-e2e
+test-kcp-e2e:
+	cd examples/kcp && make kcp-server kcp-controller test
