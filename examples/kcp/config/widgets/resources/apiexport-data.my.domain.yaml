@@ -1,0 +1,16 @@
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIExport
+metadata:
+  creationTimestamp: null
+  name: data.my.domain
+spec:
+  latestResourceSchemas:
+  - v240406-90e42b7b.widgets.data.my.domain
+  permissionClaims:
+  - all: true
+    resource: configmaps
+  - all: true
+    resource: secrets
+  - all: true
+    resource: namespaces
+status: {}
