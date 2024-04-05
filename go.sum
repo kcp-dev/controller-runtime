@@ -1,7 +1,5 @@
 github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df h1:7RFfzj4SSt6nnvCPbCqijJi1nWCd+TqAT3bYCStRC18=
 github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df/go.mod h1:pSwJ0fSY5KhvocuWSx4fz3BA8OrA1bQn+K1Eli3BRwM=
-github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=
-github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
@@ -76,10 +74,6 @@ github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnr
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/kcp-dev/apimachinery/v2 v2.0.0-alpha.0.0.20230926071920-57d168bcbe34 h1:tom0JX5OmAeOOmkGv8LaYHDtA1xAKDiQL5U0vhYYgdM=
 github.com/kcp-dev/apimachinery/v2 v2.0.0-alpha.0.0.20230926071920-57d168bcbe34/go.mod h1:cWoaYGHl1nlzdEM2xvMzIASkEZJZLSf5nhe17M7wDhw=
-github.com/kcp-dev/controller-runtime/examples/kcp v0.0.0-20240429114249-607a854c2cfe h1:blMRNjSiWkdZHQeU4B0WraZVVVniDklkUSdom7FWlxU=
-github.com/kcp-dev/controller-runtime/examples/kcp v0.0.0-20240429114249-607a854c2cfe/go.mod h1:J5yVL/5SPHDegVbEV9k7K/WpjVFvQUZMt/KB+sPR0V0=
-github.com/kcp-dev/kcp/sdk v0.24.0 h1:ZTfStDOQshVU2cnrqjgMo9xb0VNblkmrgMRtl0PCQEY=
-github.com/kcp-dev/kcp/sdk v0.24.0/go.mod h1:Pd2xxw/qhgfF2xgHolVwheq9VOJwPtNrBmxgBlYmjfk=
 github.com/kcp-dev/logicalcluster/v3 v3.0.5 h1:JbYakokb+5Uinz09oTXomSUJVQsqfxEvU4RyHUYxHOU=
 github.com/kcp-dev/logicalcluster/v3 v3.0.5/go.mod h1:EWBUBxdr49fUB1cLMO4nOdBWmYifLbP1LfoL20KkXYY=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
