@@ -11,3 +11,24 @@ presubmits:
         command:
         - make
         - test
+
+  - name: pull-kcp-test-e2e
+    decorate: true
+    # only run e2e tests if code changed.
+    run_if_changed: "(cmd|config|pkg|sdk|test|go.mod|go.sum|Makefile|.prow.yaml)"
+    clone_uri: "https://github.com/kcp-dev/controller-runtime"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: ghcr.io/kcp-dev/infra/build:1.21.8-1
+          env:
+          - name: KUBECONFIG
+            value: /home/prow/go/src/github.com/kcp-dev/controller-runtime/examples/kcp/.test/kcp.kubeconfig
+          command:
+            - make
+            - test-kcp-e2e
+          resources:
+            requests:
+              memory: 6Gi
+              cpu: 4
