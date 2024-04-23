@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package configmap
 
 import (
 	"context"
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/kcp"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,68 +33,63 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type ConfigMapReconciler struct {
-	client.Client
+type Reconciler struct {
+	Client client.Client
 }
 
-func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx).WithValues("cluster", req.ClusterName)
 
 	// Test get
-	var configMap corev1.ConfigMap
-	if err := r.Client.Get(ctx, req.NamespacedName, &configMap); err != nil {
+	var cm corev1.ConfigMap
+	if err := r.Client.Get(ctx, req.NamespacedName, &cm); err != nil {
 		log.Error(err, "unable to get configmap")
 		return ctrl.Result{}, nil
 	}
 
 	log.Info("Get: retrieved configMap")
-	labels := configMap.Labels
+	if cm.Labels["name"] != "" {
+		response := fmt.Sprintf("hello-%s", cm.Labels["name"])
 
-	if labels["name"] != "" {
-		response := fmt.Sprintf("hello-%s", labels["name"])
-
-		if labels["response"] != response {
-			labels["response"] = response
+		if cm.Labels["response"] != response {
+			cm.Labels["response"] = response
 
 			// Test Update
-			if err := r.Client.Update(ctx, &configMap); err != nil {
+			if err := r.Client.Update(ctx, &cm); err != nil {
 				return ctrl.Result{}, err
 			}
+
 			log.Info("Update: updated configMap")
 			return ctrl.Result{}, nil
 		}
 	}
 
 	// Test list
-	var configMapList corev1.ConfigMapList
-	if err := r.Client.List(ctx, &configMapList); err != nil {
+	var cms corev1.ConfigMapList
+	if err := r.Client.List(ctx, &cms); err != nil {
 		log.Error(err, "unable to list configmaps")
 		return ctrl.Result{}, nil
 	}
-	log.Info("List: got", "itemCount", len(configMapList.Items))
+	log.Info("List: got", "itemCount", len(cms.Items))
 	found := false
-	for _, cm := range configMapList.Items {
+	for _, other := range cms.Items {
 		cluster, ok := kontext.ClusterFrom(ctx)
 		if !ok {
-			log.Info("List: got", "clusterName", cluster.String(), "namespace", cm.Namespace, "name", cm.Name)
-		} else {
-			if cm.Name == configMap.Name && cm.Namespace == configMap.Namespace {
-				if found {
-					return ctrl.Result{}, fmt.Errorf("there should be listed only one configmap with the given name '%s' for the given namespace '%s' when the clusterName is not available", cm.Name, cm.Namespace)
-				}
-				found = true
-				log.Info("Found in listed configmaps", "namespace", cm.Namespace, "name", cm.Name)
+			log.Info("List: got", "clusterName", cluster.String(), "namespace", other.Namespace, "name", other.Name)
+		} else if other.Name == cm.Name && other.Namespace == cm.Namespace {
+			if found {
+				return ctrl.Result{}, fmt.Errorf("there should be listed only one configmap with the given name '%s' for the given namespace '%s' when the clusterName is not available", cm.Name, cm.Namespace)
 			}
+			found = true
+			log.Info("Found in listed configmaps", "namespace", cm.Namespace, "name", cm.Name)
 		}
 	}
 
 	// If the configmap has a namespace field, create the corresponding namespace
-	nsName, exists := configMap.Data["namespace"]
+	nsName, exists := cm.Data["namespace"]
 	if exists {
 		var namespace corev1.Namespace
-		nsKey := types.NamespacedName{Name: nsName}
-
-		if err := r.Client.Get(ctx, nsKey, &namespace); err != nil {
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: nsName}, &namespace); err != nil {
 			if !apierrors.IsNotFound(err) {
 				log.Error(err, "unable to get namespace")
 				return ctrl.Result{}, err
@@ -107,29 +102,28 @@ func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				return ctrl.Result{}, err
 			}
 			log.Info("Create: created ", "namespace", nsName)
-			return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+			return ctrl.Result{Requeue: true}, nil
 		}
 		log.Info("Exists", "namespace", nsName)
 	}
 
 	// If the configmap has a secretData field, create a secret in the same namespace
 	// If the secret already exists but is out of sync, it will be non-destructively patched
-	secretData, exists := configMap.Data["secretData"]
+	secretData, exists := cm.Data["secretData"]
 	if exists {
 		var secret corev1.Secret
-
-		secret.SetName(configMap.GetName())
-		secret.SetNamespace(configMap.GetNamespace())
-		secret.SetOwnerReferences([]metav1.OwnerReference{metav1.OwnerReference{
-			Name:       configMap.GetName(),
-			UID:        configMap.GetUID(),
+		secret.SetName(cm.GetName())
+		secret.SetNamespace(cm.GetNamespace())
+		secret.SetOwnerReferences([]metav1.OwnerReference{{
+			Name:       cm.GetName(),
+			UID:        cm.GetUID(),
 			APIVersion: "v1",
 			Kind:       "ConfigMap",
 			Controller: func() *bool { x := true; return &x }(),
 		}})
 		secret.Data = map[string][]byte{"dataFromCM": []byte(secretData)}
 
-		operationResult, err := controllerutil.CreateOrPatch(ctx, r, &secret, func() error {
+		operationResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &secret, func() error {
 			secret.Data["dataFromCM"] = []byte(secretData)
 			return nil
 		})
@@ -143,9 +137,9 @@ func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (r *ConfigMapReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
-		Complete(WithClusterInContext(r))
+		Complete(kcp.WithClusterInContext(r))
 }

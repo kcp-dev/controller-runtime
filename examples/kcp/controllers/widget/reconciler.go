@@ -14,33 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package widget
 
 import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/kcp"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	datav1alpha1 "github.com/kcp-dev/controller-runtime/examples/kcp/apis/v1alpha1"
 )
 
-// WidgetReconciler reconciles a Widget object
-type WidgetReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
+// Reconciler reconciles a Widget object
+type Reconciler struct {
+	Client client.Client
 }
 
 // Reconcile TODO
-func (r *WidgetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := log.FromContext(ctx)
 
 	// Include the clusterName from req.ObjectKey in the logger, similar to the namespace and name keys that are already
 	// there.
-	logger = logger.WithValues("clusterName", req.ClusterName)
+	log = log.WithValues("clusterName", req.ClusterName)
 
 	// You probably wouldn't need to do this, but if you wanted to list all instances across all logical clusters:
 	var allWidgets datav1alpha1.WidgetList
@@ -48,38 +47,28 @@ func (r *WidgetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("Listed all widgets across all workspaces", "count", len(allWidgets.Items))
+	log.Info("Listed all widgets across all workspaces", "count", len(allWidgets.Items))
 
-	logger.Info("Getting widget")
+	log.Info("Getting widget")
 	var w datav1alpha1.Widget
 	if err := r.Client.Get(ctx, req.NamespacedName, &w); err != nil {
 		if errors.IsNotFound(err) {
 			// Normal - was deleted
 			return ctrl.Result{}, nil
 		}
-
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("Listing all widgets in the current logical cluster")
+	log.Info("Listing all widgets in the current logical cluster")
 	var list datav1alpha1.WidgetList
 	if err := r.Client.List(ctx, &list); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	numWidgets := len(list.Items)
-	if numWidgets == w.Status.Total {
-		logger.Info("No need to patch because the widget status is already correct")
-		return ctrl.Result{}, nil
-	}
-
-	logger.Info("Patching widget status to store total widget count in the current logical cluster")
-	original := w.DeepCopy()
-	patch := client.MergeFrom(original)
-
-	w.Status.Total = numWidgets
-
-	if err := r.Client.Status().Patch(ctx, &w, patch); err != nil {
+	log.Info("Patching widget status to store total widget count in the current logical cluster")
+	orig := w.DeepCopy()
+	w.Status.Total = len(list.Items)
+	if err := r.Client.Status().Patch(ctx, &w, client.MergeFromWithOptions(orig, client.MergeFromWithOptimisticLock{})); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -87,8 +76,8 @@ func (r *WidgetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *WidgetReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&datav1alpha1.Widget{}).
-		Complete(WithClusterInContext(r))
+		Complete(kcp.WithClusterInContext(r))
 }
