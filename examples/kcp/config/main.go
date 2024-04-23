@@ -17,13 +17,14 @@ limitations under the License.
 package main
 
 import (
+	"os"
+
 	kcpclienthelper "github.com/kcp-dev/apimachinery/v2/pkg/client"
 	apisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	"github.com/kcp-dev/kcp/sdk/apis/core"
 	corev1alpha1 "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	tenancyv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
 	"github.com/kcp-dev/logicalcluster/v3"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -34,8 +35,8 @@ import (
 
 	"github.com/kcp-dev/controller-runtime/examples/kcp/config/consumers"
 	"github.com/kcp-dev/controller-runtime/examples/kcp/config/widgets"
-	"github.com/kcp-dev/controller-runtime/examples/kcp/config/widgets/resources"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	widgetresources "github.com/kcp-dev/controller-runtime/examples/kcp/config/widgets/resources"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // config is bootstrap set of assets for the controller-runtime examples.
@@ -49,16 +50,11 @@ import (
 // done by the platform operator to enable service providers to deploy their
 // controllers.
 
-var (
-	scheme = runtime.NewScheme()
-)
-
 func init() {
-	utilruntime.Must(tenancyv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(corev1alpha1.AddToScheme(scheme))
-	utilruntime.Must(apisv1alpha1.AddToScheme(scheme))
-
+	utilruntime.Must(tenancyv1alpha1.AddToScheme(clientgoscheme.Scheme))
+	utilruntime.Must(clientgoscheme.AddToScheme(clientgoscheme.Scheme))
+	utilruntime.Must(corev1alpha1.AddToScheme(clientgoscheme.Scheme))
+	utilruntime.Must(apisv1alpha1.AddToScheme(clientgoscheme.Scheme))
 }
 
 var (
@@ -73,44 +69,45 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	ctx := ctrl.SetupSignalHandler()
-	log := log.FromContext(ctx)
+	log := ctrllog.FromContext(ctx)
 
 	restConfig, err := config.GetConfigWithContext("base")
 	if err != nil {
 		log.Error(err, "unable to get config")
+		os.Exit(1)
 	}
 
 	restCopy := rest.CopyConfig(restConfig)
 	restRoot := rest.AddUserAgent(kcpclienthelper.SetCluster(restCopy, core.RootCluster.Path()), "bootstrap-root")
-	clientRoot, err := client.New(restRoot, client.Options{
-		Scheme: scheme,
-	})
+	rootClient, err := client.New(restRoot, client.Options{})
 	if err != nil {
 		log.Error(err, "unable to create client")
+		os.Exit(1)
 	}
 
 	restCopy = rest.CopyConfig(restConfig)
 	restWidgets := rest.AddUserAgent(kcpclienthelper.SetCluster(restCopy, clusterName), "bootstrap-widgets")
-	clientWidgets, err := client.New(restWidgets, client.Options{
-		Scheme: scheme,
-	})
+	widgetsClient, err := client.New(restWidgets, client.Options{})
 	if err != nil {
 		log.Error(err, "unable to create client")
+		os.Exit(1)
 	}
 
-	err = widgets.Bootstrap(ctx, clientRoot)
+	err = widgets.Bootstrap(ctx, rootClient)
 	if err != nil {
 		log.Error(err, "failed to bootstrap widgets")
+		os.Exit(1)
 	}
 
-	err = resources.Bootstrap(ctx, clientWidgets)
+	err = widgetresources.Bootstrap(ctx, widgetsClient)
 	if err != nil {
 		log.Error(err, "failed to bootstrap resources")
+		os.Exit(1)
 	}
 
-	err = consumers.Bootstrap(ctx, clientRoot)
+	err = consumers.Bootstrap(ctx, rootClient)
 	if err != nil {
 		log.Error(err, "failed to bootstrap consumers")
+		os.Exit(1)
 	}
-
 }
