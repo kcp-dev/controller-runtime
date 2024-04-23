@@ -25,7 +25,6 @@ import (
 	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -75,7 +74,6 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 	log := log.FromContext(ctx)
-	fakeBatteries := sets.New("")
 
 	restConfig, err := config.GetConfigWithContext("base")
 	if err != nil {
@@ -100,17 +98,17 @@ func main() {
 		log.Error(err, "unable to create client")
 	}
 
-	err = widgets.Bootstrap(ctx, clientRoot, fakeBatteries)
+	err = widgets.Bootstrap(ctx, clientRoot)
 	if err != nil {
 		log.Error(err, "failed to bootstrap widgets")
 	}
 
-	err = resources.Bootstrap(ctx, clientWidgets, fakeBatteries)
+	err = resources.Bootstrap(ctx, clientWidgets)
 	if err != nil {
 		log.Error(err, "failed to bootstrap resources")
 	}
 
-	err = consumers.Bootstrap(ctx, clientRoot, fakeBatteries)
+	err = consumers.Bootstrap(ctx, clientRoot)
 	if err != nil {
 		log.Error(err, "failed to bootstrap consumers")
 	}

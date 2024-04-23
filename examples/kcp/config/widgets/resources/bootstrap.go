@@ -20,7 +20,6 @@ import (
 	"context"
 	"embed"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -36,12 +35,11 @@ var fs embed.FS
 func Bootstrap(
 	ctx context.Context,
 	client client.Client,
-	batteriesIncluded sets.Set[string],
 ) error {
 	log := log.FromContext(ctx)
 
 	log.Info("Bootstrapping widgets resources")
-	if err := confighelpers.Bootstrap(ctx, client, fs, batteriesIncluded); err != nil {
+	if err := confighelpers.Bootstrap(ctx, client, fs); err != nil {
 		return err
 	}
 

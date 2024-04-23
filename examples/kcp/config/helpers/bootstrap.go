@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"text/template"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	apimachineryerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,10 +25,10 @@ import (
 // Bootstrap creates resources in a package's fs by
 // continuously retrying the list. This is blocking, i.e. it only returns (with error)
 // when the context is closed or with nil when the bootstrapping is successfully completed.
-func Bootstrap(ctx context.Context, client client.Client, fs embed.FS, batteriesIncluded sets.Set[string]) error {
+func Bootstrap(ctx context.Context, client client.Client, fs embed.FS) error {
 	// bootstrap non-crd resources
 	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
-		if err := CreateResourcesFromFS(ctx, client, fs, batteriesIncluded); err != nil {
+		if err := CreateResourcesFromFS(ctx, client, fs); err != nil {
 			log.FromContext(ctx).WithValues("err", err).Info("failed to bootstrap resources, retrying")
 			return false, nil
 		}
@@ -39,7 +37,7 @@ func Bootstrap(ctx context.Context, client client.Client, fs embed.FS, batteries
 }
 
 // CreateResourcesFromFS creates all resources from a filesystem.
-func CreateResourcesFromFS(ctx context.Context, client client.Client, fs embed.FS, batteriesIncluded sets.Set[string]) error {
+func CreateResourcesFromFS(ctx context.Context, client client.Client, fs embed.FS) error {
 	files, err := fs.ReadDir(".")
 	if err != nil {
 		return err
@@ -50,7 +48,7 @@ func CreateResourcesFromFS(ctx context.Context, client client.Client, fs embed.F
 		if f.IsDir() {
 			continue
 		}
-		if err := CreateResourceFromFS(ctx, client, f.Name(), fs, batteriesIncluded); err != nil {
+		if err := CreateResourceFromFS(ctx, client, f.Name(), fs); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -58,7 +56,7 @@ func CreateResourcesFromFS(ctx context.Context, client client.Client, fs embed.F
 }
 
 // CreateResourceFromFS creates given resource file.
-func CreateResourceFromFS(ctx context.Context, client client.Client, filename string, fs embed.FS, batteriesIncluded sets.Set[string]) error {
+func CreateResourceFromFS(ctx context.Context, client client.Client, filename string, fs embed.FS) error {
 	raw, err := fs.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("could not read %s: %w", filename, err)
@@ -81,17 +79,14 @@ func CreateResourceFromFS(ctx context.Context, client client.Client, filename st
 			continue
 		}
 
-		if err := createResourceFromFS(ctx, client, doc, batteriesIncluded); err != nil {
+		if err := createResourceFromFS(ctx, client, doc); err != nil {
 			errs = append(errs, fmt.Errorf("failed to create resource %s doc %d: %w", filename, i, err))
 		}
 	}
 	return apimachineryerrors.NewAggregate(errs)
 }
 
-const annotationCreateOnlyKey = "bootstrap.kcp.io/create-only"
-const annotationBattery = "bootstrap.kcp.io/battery"
-
-func createResourceFromFS(ctx context.Context, client client.Client, raw []byte, batteriesIncluded sets.Set[string]) error {
+func createResourceFromFS(ctx context.Context, client client.Client, raw []byte) error {
 	log := log.FromContext(ctx)
 
 	type Input struct {
@@ -99,9 +94,6 @@ func createResourceFromFS(ctx context.Context, client client.Client, raw []byte,
 	}
 	input := Input{
 		Batteries: map[string]bool{},
-	}
-	for _, b := range sets.List[string](batteriesIncluded) {
-		input.Batteries[b] = true
 	}
 	tmpl, err := template.New("manifest").Parse(string(raw))
 	if err != nil {
@@ -121,21 +113,6 @@ func createResourceFromFS(ctx context.Context, client client.Client, raw []byte,
 		return fmt.Errorf("decoded into incorrect type, got %T, wanted %T", obj, &unstructured.Unstructured{})
 	}
 
-	if v, found := u.GetAnnotations()[annotationBattery]; found {
-		partOf := strings.Split(v, ",")
-		included := false
-		for _, p := range partOf {
-			if batteriesIncluded.Has(strings.TrimSpace(p)) {
-				included = true
-				break
-			}
-		}
-		if !included {
-			log.V(4).WithValues("resource", u.GetName(), "batteriesRequired", v, "batteriesIncluded", batteriesIncluded).Info("skipping resource because required batteries are not among included batteries")
-			return nil
-		}
-	}
-
 	key := types.NamespacedName{
 		Namespace: u.GetNamespace(),
 		Name:      u.GetName(),
@@ -146,12 +123,6 @@ func createResourceFromFS(ctx context.Context, client client.Client, raw []byte,
 			err = client.Get(ctx, key, u)
 			if err != nil {
 				return err
-			}
-
-			if _, exists := u.GetAnnotations()[annotationCreateOnlyKey]; exists {
-				log.Info("skipping update of object because it has the create-only annotation")
-
-				return nil
 			}
 
 			u.SetResourceVersion(u.GetResourceVersion())

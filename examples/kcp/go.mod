@@ -3,7 +3,7 @@ module github.com/kcp-dev/controller-runtime/examples/kcp
 go 1.21.8
 
 // IMPORTANT: This is only an example replace directive. This is so examples can be run with the latest version of controller-runtime.
-// In your own projects, you should not use replace directives like this. Instead, you should use the latest version of controller-runtime.
+// In your own projects, you should not use replace directives like this. Instead, you should replace, but with kcp-dev/controller-runtime instead of ../../
 replace sigs.k8s.io/controller-runtime => ../../
 
 require (

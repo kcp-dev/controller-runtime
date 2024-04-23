@@ -26,4 +26,4 @@ hack/tools/bin
 junit-report.xml
 /artifacts
 
-examples/kcp/bin/*
+examples/kcp/.gitignore

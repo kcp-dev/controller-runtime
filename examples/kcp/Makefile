@@ -10,16 +10,6 @@ GO_INSTALL = ./hack/go-install.sh
 LOCALBIN ?= $(shell pwd)/bin
 ARTIFACT_DIR ?= .test
 
-KCP_APIGEN_VER := v0.23.0
-KCP_APIGEN_BIN := apigen
-KCP_APIGEN_GEN := $(LOCALBIN)/$(KCP_APIGEN_BIN)-$(KCP_APIGEN_VER)
-export KCP_APIGEN_GEN # so hack scripts can use it
-
-CONTROLLER_GEN_VER := v0.14.0
-CONTROLLER_GEN_BIN := controller-gen
-CONTROLLER_GEN := $(LOCALBIN)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER)
-export CONTROLLER_GEN # so hack scripts can use it
-
 KCP ?= $(LOCALBIN)/kcp
 KUBECTL_KCP ?= $(LOCALBIN)/kubectl-kcp
 
@@ -33,17 +23,11 @@ $(KCP): ## Download kcp locally if necessary.
 	curl -L -s -o - https://github.com/kcp-dev/kcp/releases/download/v$(KCP_VERSION)/kcp_$(KCP_VERSION)_$(OS)_$(ARCH).tar.gz | tar --directory $(LOCALBIN)/../ -xvzf - bin/kcp
 	touch $(KCP) # we download an "old" file, so make will re-download to refresh it unless we make it newer than the owning dir
 
-$(KCP_APIGEN_GEN):
-	GOBIN=$(LOCALBIN) $(GO_INSTALL) github.com/kcp-dev/kcp/sdk/cmd/apigen $(KCP_APIGEN_BIN) $(KCP_APIGEN_VER)
-
-$(CONTROLLER_GEN):
-	GOBIN=$(LOCALBIN) $(GO_INSTALL) sigs.k8s.io/controller-tools/cmd/controller-gen $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)
-
 $(KUBECTL_KCP): ## Download kcp kubectl plugins locally if necessary.
 	curl -L -s -o - https://github.com/kcp-dev/kcp/releases/download/v$(KCP_VERSION)/kubectl-kcp-plugin_$(KCP_VERSION)_$(OS)_$(ARCH).tar.gz | tar --directory $(LOCALBIN)/../ -xvzf - bin
 	touch $(KUBECTL_KCP) # we download an "old" file, so make will re-download to refresh it unless we make it newer than the owning dir
 
-build: $(KCP) $(KCP_APIGEN_GEN) $(CONTROLLER_GEN) $(KUBECTL_KCP) build-controller
+build: $(KCP) $(KUBECTL_KCP) build-controller
 
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -51,9 +35,7 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-.PHONY:
 build-controller: ## Build the controller binary.
-	rm -f $(LOCALBIN)/kcp-controller
 	go build -o $(LOCALBIN)/kcp-controller ./main.go
 
 .PHONY: kcp-server
