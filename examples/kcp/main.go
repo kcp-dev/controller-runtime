@@ -37,6 +37,7 @@ import (
 
 	datav1alpha1 "github.com/kcp-dev/controller-runtime/examples/kcp/apis/v1alpha1"
 	"github.com/kcp-dev/logicalcluster/v3"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -76,7 +77,7 @@ type Options struct {
 
 func (o *Options) addFlags(fs *flag.FlagSet) {
 	fs.StringVar(&o.KubeconfigContext, "context", "", "kubeconfig context")
-	fs.StringVar(&o.APIExportName, "api-export-name", "widgets", "The name of the APIExport.")
+	fs.StringVar(&o.APIExportName, "api-export-name", "data.my.domain", "The name of the APIExport.")
 	fs.StringVar(&o.MetricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	fs.StringVar(&o.ProbeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	fs.BoolVar(&o.EnableLeaderElection, "leader-elect", false,
