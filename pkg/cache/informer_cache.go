@@ -70,6 +70,7 @@ type informerCache struct {
 	scheme *runtime.Scheme
 	*internal.Informers
 	readerFailOnMissingInformer bool
+	clusterIndexes              bool
 }
 
 // Get implements Reader.
@@ -219,10 +220,10 @@ func (ic *informerCache) IndexField(ctx context.Context, obj client.Object, fiel
 	if err != nil {
 		return err
 	}
-	return indexByField(informer, field, extractValue)
+	return indexByField(informer, field, extractValue, ic.clusterIndexes)
 }
 
-func indexByField(informer Informer, field string, extractValue client.IndexerFunc) error {
+func indexByField(informer Informer, field string, extractValue client.IndexerFunc, clusterIndexes bool) error {
 	indexFunc := func(objRaw interface{}) ([]string, error) {
 		// TODO(directxman12): check if this is the correct type?
 		obj, isObj := objRaw.(client.Object)
@@ -236,7 +237,7 @@ func indexByField(informer Informer, field string, extractValue client.IndexerFu
 		ns := meta.GetNamespace()
 
 		keyFunc := internal.KeyToNamespacedKey
-		if clusterName := logicalcluster.From(obj); !clusterName.Empty() {
+		if clusterName := logicalcluster.From(obj); clusterIndexes && !clusterName.Empty() {
 			keyFunc = func(ns, val string) string {
 				return internal.KeyToClusteredKey(clusterName.String(), ns, val)
 			}

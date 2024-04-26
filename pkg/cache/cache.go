@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -390,6 +391,7 @@ func newCache(restConfig *rest.Config, opts Options) newCacheFunc {
 				NewInformer:           opts.NewInformerFunc,
 			}),
 			readerFailOnMissingInformer: opts.ReaderFailOnMissingInformer,
+			clusterIndexes:              strings.HasSuffix(restConfig.Host, "/clusters/*"),
 		}
 	}
 }
