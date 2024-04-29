@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -49,7 +48,7 @@ type Patch interface {
 
 // NewInformerFunc describes a function that creates SharedIndexInformers.
 // Its signature matches cache.NewSharedIndexInformer from client-go.
-type NewInformerFunc func(cache.ListerWatcher, runtime.Object, time.Duration, cache.Indexers) kcpcache.ScopeableSharedIndexInformer
+type NewInformerFunc func(cache.ListerWatcher, runtime.Object, time.Duration, cache.Indexers) cache.SharedIndexInformer
 
 // TODO(directxman12): is there a sane way to deal with get/delete options?
 

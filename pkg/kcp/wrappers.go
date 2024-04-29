@@ -70,7 +70,7 @@ func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache,
 	c := rest.CopyConfig(config)
 	c.Host += "/clusters/*"
 
-	opts.NewInformerFunc = func(lw k8scache.ListerWatcher, obj runtime.Object, syncPeriod time.Duration, indexers k8scache.Indexers) kcpcache.ScopeableSharedIndexInformer {
+	opts.NewInformerFunc = func(lw k8scache.ListerWatcher, obj runtime.Object, syncPeriod time.Duration, indexers k8scache.Indexers) k8scache.SharedIndexInformer {
 		indexers[kcpcache.ClusterIndexName] = kcpcache.ClusterIndexFunc
 		indexers[kcpcache.ClusterAndNamespaceIndexName] = kcpcache.ClusterAndNamespaceIndexFunc
 
