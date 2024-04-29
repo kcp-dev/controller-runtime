@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kcp-dev/apimachinery/v2/third_party/informers"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -486,7 +485,7 @@ func defaultOpts(config *rest.Config, opts Options) (Options, error) {
 	}
 
 	if opts.NewInformerFunc == nil {
-		opts.NewInformerFunc = informers.NewSharedIndexInformer
+		opts.NewInformerFunc = toolscache.NewSharedIndexInformer
 	}
 	return opts, nil
 }
