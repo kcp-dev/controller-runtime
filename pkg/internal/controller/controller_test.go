@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/internal/controller/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/internal/log"
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -51,13 +52,13 @@ var _ = Describe("controller", func() {
 	var fakeReconcile *fakeReconciler
 	var ctrl *Controller
 	var queue *controllertest.Queue
-	var reconciled chan reconcile.Request
+	var reconciled chan fakeReconcilerRequest
 	var request = reconcile.Request{
 		NamespacedName: types.NamespacedName{Namespace: "foo", Name: "bar"},
 	}
 
 	BeforeEach(func() {
-		reconciled = make(chan reconcile.Request)
+		reconciled = make(chan fakeReconcilerRequest)
 		fakeReconcile = &fakeReconciler{
 			Requests: reconciled,
 			results:  make(chan fakeReconcileResultPair, 10 /* chosen by the completely scientific approach of guessing */),
@@ -80,7 +81,7 @@ var _ = Describe("controller", func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ctrl.Do = reconcile.Func(func(context.Context, reconcile.Request) (reconcile.Result, error) {
+			ctrl.Do = reconcile.Func(func(doCtx context.Context, doReq reconcile.Request) (reconcile.Result, error) {
 				return reconcile.Result{Requeue: true}, nil
 			})
 			result, err := ctrl.Reconcile(ctx,
@@ -325,7 +326,7 @@ var _ = Describe("controller", func() {
 
 			By("Invoking Reconciler")
 			fakeReconcile.AddResult(reconcile.Result{}, nil)
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 
 			By("Removing the item from the queue")
 			Eventually(queue.Len).Should(Equal(0))
@@ -370,14 +371,14 @@ var _ = Describe("controller", func() {
 
 			By("Invoking Reconciler which will give an error")
 			fakeReconcile.AddResult(reconcile.Result{}, fmt.Errorf("expected error: reconcile"))
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 			queue.AddedRateLimitedLock.Lock()
 			Expect(queue.AddedRatelimited).To(Equal([]any{request}))
 			queue.AddedRateLimitedLock.Unlock()
 
 			By("Invoking Reconciler a second time without error")
 			fakeReconcile.AddResult(reconcile.Result{}, nil)
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 
 			By("Removing the item from the queue")
 			Eventually(queue.Len).Should(Equal(0))
@@ -396,7 +397,7 @@ var _ = Describe("controller", func() {
 
 			By("Invoking Reconciler which will give an error")
 			fakeReconcile.AddResult(reconcile.Result{}, reconcile.TerminalError(fmt.Errorf("expected error: reconcile")))
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 
 			queue.AddedRateLimitedLock.Lock()
 			Expect(queue.AddedRatelimited).To(BeEmpty())
@@ -423,18 +424,18 @@ var _ = Describe("controller", func() {
 
 			By("Invoking Reconciler which returns an error")
 			fakeReconcile.AddResult(reconcile.Result{}, fmt.Errorf("something's wrong"))
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 			Eventually(dq.getCounts).Should(Equal(countInfo{Trying: 1, AddRateLimited: 1}))
 
 			By("Invoking Reconciler a second time with an error")
 			fakeReconcile.AddResult(reconcile.Result{}, fmt.Errorf("another thing's wrong"))
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 
 			Eventually(dq.getCounts).Should(Equal(countInfo{Trying: 1, AddRateLimited: 2}))
 
 			By("Invoking Reconciler a third time, where it finally does not return an error")
 			fakeReconcile.AddResult(reconcile.Result{}, nil)
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 
 			Eventually(dq.getCounts).Should(Equal(countInfo{Trying: 0, AddRateLimited: 2}))
 
@@ -459,12 +460,12 @@ var _ = Describe("controller", func() {
 
 			By("Invoking Reconciler which will ask for requeue")
 			fakeReconcile.AddResult(reconcile.Result{Requeue: true}, nil)
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 			Eventually(dq.getCounts).Should(Equal(countInfo{Trying: 1, AddRateLimited: 1}))
 
 			By("Invoking Reconciler a second time without asking for requeue")
 			fakeReconcile.AddResult(reconcile.Result{Requeue: false}, nil)
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 
 			Eventually(dq.getCounts).Should(Equal(countInfo{Trying: 0, AddRateLimited: 1}))
 
@@ -489,12 +490,12 @@ var _ = Describe("controller", func() {
 
 			By("Invoking Reconciler which will ask for requeue & requeueafter")
 			fakeReconcile.AddResult(reconcile.Result{RequeueAfter: time.Millisecond * 100, Requeue: true}, nil)
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 			Eventually(dq.getCounts).Should(Equal(countInfo{Trying: 0, AddAfter: 1}))
 
 			By("Invoking Reconciler a second time asking for a requeueafter only")
 			fakeReconcile.AddResult(reconcile.Result{RequeueAfter: time.Millisecond * 100}, nil)
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 
 			Eventually(dq.getCounts).Should(Equal(countInfo{Trying: -1 /* we don't increment the count in addafter */, AddAfter: 2}))
 
@@ -519,12 +520,12 @@ var _ = Describe("controller", func() {
 
 			By("Invoking Reconciler which will ask for requeueafter with an error")
 			fakeReconcile.AddResult(reconcile.Result{RequeueAfter: time.Millisecond * 100}, fmt.Errorf("expected error: reconcile"))
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 			Eventually(dq.getCounts).Should(Equal(countInfo{Trying: 1, AddRateLimited: 1}))
 
 			By("Invoking Reconciler a second time asking for requeueafter without errors")
 			fakeReconcile.AddResult(reconcile.Result{RequeueAfter: time.Millisecond * 100}, nil)
-			Expect(<-reconciled).To(Equal(request))
+			checkReconcile(<-reconciled, request)
 			Eventually(dq.getCounts).Should(Equal(countInfo{AddAfter: 1, AddRateLimited: 1}))
 
 			By("Removing the item from the queue")
@@ -571,7 +572,7 @@ var _ = Describe("controller", func() {
 				queue.Add(request)
 
 				fakeReconcile.AddResult(reconcile.Result{}, nil)
-				Expect(<-reconciled).To(Equal(request))
+				checkReconcile(<-reconciled, request)
 				Eventually(func() error {
 					Expect(ctrlmetrics.ReconcileTotal.WithLabelValues(ctrl.Name, "success").Write(&reconcileTotal)).To(Succeed())
 					if actual := reconcileTotal.GetCounter().GetValue(); actual != 1.0 {
@@ -600,7 +601,7 @@ var _ = Describe("controller", func() {
 				queue.Add(request)
 
 				fakeReconcile.AddResult(reconcile.Result{}, fmt.Errorf("expected error: reconcile"))
-				Expect(<-reconciled).To(Equal(request))
+				checkReconcile(<-reconciled, request)
 				Eventually(func() error {
 					Expect(ctrlmetrics.ReconcileTotal.WithLabelValues(ctrl.Name, "error").Write(&reconcileTotal)).To(Succeed())
 					if actual := reconcileTotal.GetCounter().GetValue(); actual != 1.0 {
@@ -630,7 +631,7 @@ var _ = Describe("controller", func() {
 				queue.Add(request)
 
 				fakeReconcile.AddResult(reconcile.Result{Requeue: true}, nil)
-				Expect(<-reconciled).To(Equal(request))
+				checkReconcile(<-reconciled, request)
 				Eventually(func() error {
 					Expect(ctrlmetrics.ReconcileTotal.WithLabelValues(ctrl.Name, "requeue").Write(&reconcileTotal)).To(Succeed())
 					if actual := reconcileTotal.GetCounter().GetValue(); actual != 1.0 {
@@ -659,7 +660,7 @@ var _ = Describe("controller", func() {
 				queue.Add(request)
 
 				fakeReconcile.AddResult(reconcile.Result{RequeueAfter: 5 * time.Hour}, nil)
-				Expect(<-reconciled).To(Equal(request))
+				checkReconcile(<-reconciled, request)
 				Eventually(func() error {
 					Expect(ctrlmetrics.ReconcileTotal.WithLabelValues(ctrl.Name, "requeue_after").Write(&reconcileTotal)).To(Succeed())
 					if actual := reconcileTotal.GetCounter().GetValue(); actual != 1.0 {
@@ -692,7 +693,7 @@ var _ = Describe("controller", func() {
 
 				By("Invoking Reconciler which will give an error")
 				fakeReconcile.AddResult(reconcile.Result{}, fmt.Errorf("expected error: reconcile"))
-				Expect(<-reconciled).To(Equal(request))
+				checkReconcile(<-reconciled, request)
 				Eventually(func() error {
 					Expect(ctrlmetrics.ReconcileErrors.WithLabelValues(ctrl.Name).Write(&reconcileErrs)).To(Succeed())
 					if reconcileErrs.GetCounter().GetValue() != 1.0 {
@@ -703,7 +704,7 @@ var _ = Describe("controller", func() {
 
 				By("Invoking Reconciler a second time without error")
 				fakeReconcile.AddResult(reconcile.Result{}, nil)
-				Expect(<-reconciled).To(Equal(request))
+				checkReconcile(<-reconciled, request)
 
 				By("Removing the item from the queue")
 				Eventually(queue.Len).Should(Equal(0))
@@ -734,7 +735,7 @@ var _ = Describe("controller", func() {
 
 				By("Invoking Reconciler")
 				fakeReconcile.AddResult(reconcile.Result{}, nil)
-				Expect(<-reconciled).To(Equal(request))
+				checkReconcile(<-reconciled, request)
 
 				By("Removing the item from the queue")
 				Eventually(queue.Len).Should(Equal(0))
@@ -832,8 +833,13 @@ type fakeReconcileResultPair struct {
 	Err    error
 }
 
+type fakeReconcilerRequest struct {
+	reconcile.Request
+	ctx context.Context
+}
+
 type fakeReconciler struct {
-	Requests chan reconcile.Request
+	Requests chan fakeReconcilerRequest
 	results  chan fakeReconcileResultPair
 }
 
@@ -841,11 +847,12 @@ func (f *fakeReconciler) AddResult(res reconcile.Result, err error) {
 	f.results <- fakeReconcileResultPair{Result: res, Err: err}
 }
 
-func (f *fakeReconciler) Reconcile(_ context.Context, r reconcile.Request) (reconcile.Result, error) {
+func (f *fakeReconciler) Reconcile(ctx context.Context, r reconcile.Request) (reconcile.Result, error) {
 	res := <-f.results
 	if f.Requests != nil {
-		f.Requests <- r
+		f.Requests <- fakeReconcilerRequest{ctx: ctx, Request: r}
 	}
+
 	return res.Result, res.Err
 }
 
@@ -876,4 +883,11 @@ type cacheWithIndefinitelyBlockingGetInformer struct {
 func (c *cacheWithIndefinitelyBlockingGetInformer) GetInformer(ctx context.Context, obj client.Object, opts ...cache.InformerGetOption) (cache.Informer, error) {
 	<-ctx.Done()
 	return nil, errors.New("GetInformer timed out")
+}
+
+func checkReconcile(rec fakeReconcilerRequest, request reconcile.Request) {
+	Expect(rec.Request).To(Equal(request))
+
+	_, ok := kontext.ClusterFrom(rec.ctx)
+	Expect(ok).To(BeTrue())
 }
