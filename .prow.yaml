@@ -7,7 +7,7 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: ghcr.io/kcp-dev/infra/build:1.21.8-1
+      - image: ghcr.io/kcp-dev/infra/build:1.22.2-1
         command:
         - make
         - test
@@ -21,7 +21,7 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-        - image: ghcr.io/kcp-dev/infra/build:1.21.8-1
+        - image: ghcr.io/kcp-dev/infra/build:1.22.2-1
           env:
           - name: KUBECONFIG
             value: /home/prow/go/src/github.com/kcp-dev/controller-runtime/examples/kcp/.test/kcp.kubeconfig
