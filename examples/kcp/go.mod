@@ -7,7 +7,6 @@ go 1.22.0
 replace sigs.k8s.io/controller-runtime => ../../
 
 require (
-	github.com/davecgh/go-spew v1.1.1
 	github.com/google/go-cmp v0.6.0
 	github.com/kcp-dev/apimachinery/v2 v2.0.0-alpha.0.0.20230926071920-57d168bcbe34
 	github.com/kcp-dev/kcp/sdk v0.24.0
@@ -30,6 +29,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
@@ -112,12 +112,6 @@ require (
 )
 
 replace (
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.18.0
-	github.com/prometheus/common => github.com/prometheus/common v0.32.1
-	k8s.io/api => k8s.io/api v0.29.0
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.29.0
-	k8s.io/apimachinery => k8s.io/apimachinery v0.29.0
-	k8s.io/apiserver => k8s.io/apiserver v0.29.0
-	k8s.io/client-go => k8s.io/client-go v0.29.0
-	k8s.io/component-base => k8s.io/component-base v0.29.0
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.16.0
+	github.com/prometheus/common => github.com/prometheus/common v0.44.0
 )
