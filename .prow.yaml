@@ -1,0 +1,34 @@
+presubmits:
+  - name: pull-controller-runtime-everything
+    always_run: true
+    decorate: true
+    clone_uri: "ssh://git@github.com/kcp-dev/controller-runtime.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+      - image: ghcr.io/kcp-dev/infra/build:1.22.2-1
+        command:
+        - make
+        - test
+
+  - name: pull-controller-runtime-example-e2e
+    decorate: true
+    # only run e2e tests if code changed.
+    run_if_changed: "(pkg|examples|go.mod|go.sum|Makefile|.prow.yaml)"
+    clone_uri: "https://github.com/kcp-dev/controller-runtime"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: ghcr.io/kcp-dev/infra/build:1.22.2-1
+          env:
+          - name: KUBECONFIG
+            value: /home/prow/go/src/github.com/kcp-dev/controller-runtime/examples/kcp/.test/kcp.kubeconfig
+          command:
+            - make
+            - test-kcp-e2e
+          resources:
+            requests:
+              memory: 6Gi
+              cpu: 4

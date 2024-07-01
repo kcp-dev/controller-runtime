@@ -121,6 +121,11 @@ type Options struct {
 	// By default, the client will use the cache for reads and direct calls for writes.
 	Client client.Options
 
+	// NewAPIReaderFunc is the function that creates the APIReader client to be
+	// used by the manager. If not set this will use the default new APIReader
+	// function.
+	NewAPIReader client.NewAPIReaderFunc
+
 	// NewClient is the func that creates the client to be used by the manager.
 	// If not set this will create a Client backed by a Cache for read operations
 	// and a direct Client for write operations.
@@ -230,7 +235,7 @@ func New(config *rest.Config, opts ...Option) (Cluster, error) {
 	}
 
 	// Create the API Reader, a client with no cache.
-	clientReader, err := client.New(config, client.Options{
+	clientReader, err := options.NewAPIReader(config, client.Options{
 		HTTPClient: options.HTTPClient,
 		Scheme:     options.Scheme,
 		Mapper:     mapper,
@@ -278,6 +283,10 @@ func setOptionsDefaults(options Options, config *rest.Config) (Options, error) {
 
 	if options.MapperProvider == nil {
 		options.MapperProvider = apiutil.NewDynamicRESTMapper
+	}
+
+	if options.NewAPIReader == nil {
+		options.NewAPIReader = client.NewAPIReader
 	}
 
 	// Allow users to define how to create a new client

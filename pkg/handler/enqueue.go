@@ -20,6 +20,8 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,25 +54,16 @@ func (e *TypedEnqueueRequestForObject[T]) Create(ctx context.Context, evt event.
 		enqueueLog.Error(nil, "CreateEvent received with no metadata", "event", evt)
 		return
 	}
-	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-		Name:      evt.Object.GetName(),
-		Namespace: evt.Object.GetNamespace(),
-	}})
+	q.Add(request(evt.Object))
 }
 
 // Update implements EventHandler.
 func (e *TypedEnqueueRequestForObject[T]) Update(ctx context.Context, evt event.TypedUpdateEvent[T], q workqueue.RateLimitingInterface) {
 	switch {
 	case !isNil(evt.ObjectNew):
-		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-			Name:      evt.ObjectNew.GetName(),
-			Namespace: evt.ObjectNew.GetNamespace(),
-		}})
+		q.Add(request(evt.ObjectNew))
 	case !isNil(evt.ObjectOld):
-		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-			Name:      evt.ObjectOld.GetName(),
-			Namespace: evt.ObjectOld.GetNamespace(),
-		}})
+		q.Add(request(evt.ObjectOld))
 	default:
 		enqueueLog.Error(nil, "UpdateEvent received with no metadata", "event", evt)
 	}
@@ -82,10 +75,7 @@ func (e *TypedEnqueueRequestForObject[T]) Delete(ctx context.Context, evt event.
 		enqueueLog.Error(nil, "DeleteEvent received with no metadata", "event", evt)
 		return
 	}
-	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-		Name:      evt.Object.GetName(),
-		Namespace: evt.Object.GetNamespace(),
-	}})
+	q.Add(request(evt.Object))
 }
 
 // Generic implements EventHandler.
@@ -94,10 +84,18 @@ func (e *TypedEnqueueRequestForObject[T]) Generic(ctx context.Context, evt event
 		enqueueLog.Error(nil, "GenericEvent received with no metadata", "event", evt)
 		return
 	}
-	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-		Name:      evt.Object.GetName(),
-		Namespace: evt.Object.GetNamespace(),
-	}})
+	q.Add(request(evt.Object))
+}
+
+func request(obj client.Object) reconcile.Request {
+	return reconcile.Request{
+		// TODO(kcp) Need to implement a non-kcp-specific way to support this
+		ClusterName: logicalcluster.From(obj).String(),
+		NamespacedName: types.NamespacedName{
+			Namespace: obj.GetNamespace(),
+			Name:      obj.GetName(),
+		},
+	}
 }
 
 func isNil(arg any) bool {
