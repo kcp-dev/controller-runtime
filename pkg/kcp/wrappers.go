@@ -17,6 +17,7 @@ limitations under the License.
 package kcp
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	k8scache "k8s.io/client-go/tools/cache"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,11 +56,11 @@ func NewClusterAwareManager(cfg *rest.Config, options ctrl.Options) (manager.Man
 	}
 
 	if options.MapperProvider == nil {
-		options.MapperProvider = NewClusterAwareMapperProvider
+		options.MapperProvider = newWildcardClusterMapperProvider
 	}
 
 	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-		return newClusterRoundTripper(rt)
+		return newClusterAwareRoundTripper(rt)
 	})
 	return ctrl.NewManager(cfg, options)
 }
@@ -77,7 +77,7 @@ func NewInformerWithClusterIndexes(lw k8scache.ListerWatcher, obj runtime.Object
 // NewClusterAwareCache returns a cache.Cache that handles multi-cluster watches.
 func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 	c := rest.CopyConfig(config)
-	c.Host += "/clusters/*"
+	c.Host = strings.TrimSuffix(c.Host, "/") + "/clusters/*"
 
 	opts.NewInformerFunc = NewInformerWithClusterIndexes
 	return cache.New(c, opts)
@@ -99,11 +99,16 @@ func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache,
 //		...
 //	}
 func NewClusterAwareAPIReader(config *rest.Config, opts client.Options) (client.Reader, error) {
-	httpClient, err := ClusterAwareHTTPClient(config)
-	if err != nil {
-		return nil, err
+	if opts.HTTPClient == nil {
+		httpClient, err := NewClusterAwareHTTPClient(config)
+		if err != nil {
+			return nil, err
+		}
+		opts.HTTPClient = httpClient
 	}
-	opts.HTTPClient = httpClient
+	if opts.Mapper == nil && opts.MapperWithContext == nil {
+		opts.MapperWithContext = NewClusterAwareMapperProvider(config, opts.HTTPClient)
+	}
 	return client.NewAPIReader(config, opts)
 }
 
@@ -122,52 +127,43 @@ func NewClusterAwareAPIReader(config *rest.Config, opts client.Options) (client.
 //		...
 //	}
 func NewClusterAwareClient(config *rest.Config, opts client.Options) (client.Client, error) {
-	httpClient, err := ClusterAwareHTTPClient(config)
-	if err != nil {
-		return nil, err
+	if opts.HTTPClient == nil {
+		httpClient, err := NewClusterAwareHTTPClient(config)
+		if err != nil {
+			return nil, err
+		}
+		opts.HTTPClient = httpClient
 	}
-	opts.HTTPClient = httpClient
+	if opts.Mapper == nil && opts.MapperWithContext == nil {
+		opts.MapperWithContext = NewClusterAwareMapperProvider(config, opts.HTTPClient)
+	}
 	return client.New(config, opts)
 }
 
-// NewClusterAwareClientForConfig returns a client.Client that is configured to use the context to scope
-// requests to the proper cluster. To scope requests, pass the request context with the cluster set.
-// Example:
-//
-//	import (
-//		"context"
-//		kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
-//		ctrl "sigs.k8s.io/controller-runtime"
-//	)
-//	func (r *reconciler)  Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-//		ctx = kcpclient.WithCluster(ctx, req.ObjectKey.Cluster)
-//		// from here on pass this context to all client calls
-//		...
-//	}
-func NewClusterAwareClientForConfig(config *rest.Config, httpClient *http.Client) (client.Client, error) {
-	restMapper, err := NewClusterAwareMapperProvider(config, httpClient)
-	if err != nil {
-		return nil, err
-	}
-	return client.New(config, client.Options{
-		Mapper:     restMapper,
-		HTTPClient: httpClient,
-	})
-}
-
-// ClusterAwareHTTPClient returns an http.Client with a cluster aware round tripper.
-func ClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
+// NewClusterAwareHTTPClient returns an http.Client with a cluster aware round tripper.
+func NewClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
 	httpClient, err := rest.HTTPClientFor(config)
 	if err != nil {
 		return nil, err
 	}
 
-	httpClient.Transport = newClusterRoundTripper(httpClient.Transport)
+	httpClient.Transport = newClusterAwareRoundTripper(httpClient.Transport)
 	return httpClient, nil
 }
 
-// NewClusterAwareMapperProvider is a MapperProvider that returns a logical cluster aware meta.RESTMapper.
-func NewClusterAwareMapperProvider(c *rest.Config, httpClient *http.Client) (meta.RESTMapper, error) {
+// NewClusterAwareMapperProvider returns a function producing RESTMapper for the
+// cluster specified in the context.
+func NewClusterAwareMapperProvider(c *rest.Config, httpClient *http.Client) func(ctx context.Context) (meta.RESTMapper, error) {
+	return func(ctx context.Context) (meta.RESTMapper, error) {
+		cluster, _ := kontext.ClusterFrom(ctx) // intentionally ignoring second "found" return value
+		cl := *httpClient
+		cl.Transport = clusterRoundTripper{cluster: cluster.Path(), delegate: httpClient.Transport}
+		return apiutil.NewDynamicRESTMapper(c, &cl)
+	}
+}
+
+// newWildcardClusterMapperProvider returns a RESTMapper that talks to the /clusters/* endpoint.
+func newWildcardClusterMapperProvider(c *rest.Config, httpClient *http.Client) (meta.RESTMapper, error) {
 	mapperCfg := rest.CopyConfig(c)
 	if !strings.HasSuffix(mapperCfg.Host, "/clusters/*") {
 		mapperCfg.Host += "/clusters/*"
@@ -202,24 +198,38 @@ func ClusterAwareBuilderWithOptions(options cache.Options) cache.NewCacheFunc {
 	}
 }
 
-// clusterRoundTripper is a cluster aware wrapper around http.RoundTripper.
-type clusterRoundTripper struct {
+// clusterAwareRoundTripper is a cluster-aware wrapper around http.RoundTripper
+// taking the cluster from the context.
+type clusterAwareRoundTripper struct {
 	delegate http.RoundTripper
 }
 
-// newClusterRoundTripper creates a new cluster aware round tripper.
-func newClusterRoundTripper(delegate http.RoundTripper) *clusterRoundTripper {
-	return &clusterRoundTripper{
+// newClusterAwareRoundTripper creates a new cluster aware round tripper.
+func newClusterAwareRoundTripper(delegate http.RoundTripper) *clusterAwareRoundTripper {
+	return &clusterAwareRoundTripper{
 		delegate: delegate,
 	}
 }
 
-func (c *clusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (c *clusterAwareRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	cluster, ok := kontext.ClusterFrom(req.Context())
-	if ok {
+	if ok && !cluster.Empty() {
+		return clusterRoundTripper{cluster: cluster.Path(), delegate: c.delegate}.RoundTrip(req)
+	}
+	return c.delegate.RoundTrip(req)
+}
+
+// clusterRoundTripper is static cluster-aware wrapper around http.RoundTripper.
+type clusterRoundTripper struct {
+	cluster  logicalcluster.Path
+	delegate http.RoundTripper
+}
+
+func (c clusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !c.cluster.Empty() {
 		req = req.Clone(req.Context())
-		req.URL.Path = generatePath(req.URL.Path, cluster.Path())
-		req.URL.RawPath = generatePath(req.URL.RawPath, cluster.Path())
+		req.URL.Path = generatePath(req.URL.Path, c.cluster)
+		req.URL.RawPath = generatePath(req.URL.RawPath, c.cluster)
 	}
 	return c.delegate.RoundTrip(req)
 }

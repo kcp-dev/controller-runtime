@@ -20,11 +20,15 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/metadata"
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
 // TODO(directxman12): we could rewrite this on top of the low-level REST
@@ -34,12 +38,28 @@ import (
 
 // metadataClient is a client that reads & writes metadata-only requests to/from the API server.
 type metadataClient struct {
-	client     metadata.Interface
-	restMapper meta.RESTMapper
+	client      metadata.Interface
+	restMapper  func(ctx context.Context) (meta.RESTMapper, error)
+	mu          sync.Mutex
+	mapperCache *lru.Cache[logicalcluster.Name, meta.RESTMapper]
 }
 
-func (mc *metadataClient) getResourceInterface(gvk schema.GroupVersionKind, ns string) (metadata.ResourceInterface, error) {
-	mapping, err := mc.restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+func (mc *metadataClient) getResourceInterface(ctx context.Context, gvk schema.GroupVersionKind, ns string) (metadata.ResourceInterface, error) {
+	cluster, _ := kontext.ClusterFrom(ctx)
+	mc.mu.Lock()
+	mapper, _ := mc.mapperCache.Get(cluster)
+	if mapper == nil {
+		var err error
+		mapper, err = mc.restMapper(ctx)
+		if err != nil {
+			mc.mu.Unlock()
+			return nil, err
+		}
+		mc.mapperCache.Add(cluster, mapper)
+	}
+	mc.mu.Unlock()
+
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +76,7 @@ func (mc *metadataClient) Delete(ctx context.Context, obj Object, opts ...Delete
 		return fmt.Errorf("metadata client did not understand object: %T", obj)
 	}
 
-	resInt, err := mc.getResourceInterface(metadata.GroupVersionKind(), metadata.Namespace)
+	resInt, err := mc.getResourceInterface(ctx, metadata.GroupVersionKind(), metadata.Namespace)
 	if err != nil {
 		return err
 	}
@@ -77,7 +97,7 @@ func (mc *metadataClient) DeleteAllOf(ctx context.Context, obj Object, opts ...D
 	deleteAllOfOpts := DeleteAllOfOptions{}
 	deleteAllOfOpts.ApplyOptions(opts)
 
-	resInt, err := mc.getResourceInterface(metadata.GroupVersionKind(), deleteAllOfOpts.ListOptions.Namespace)
+	resInt, err := mc.getResourceInterface(ctx, metadata.GroupVersionKind(), deleteAllOfOpts.ListOptions.Namespace)
 	if err != nil {
 		return err
 	}
@@ -93,7 +113,7 @@ func (mc *metadataClient) Patch(ctx context.Context, obj Object, patch Patch, op
 	}
 
 	gvk := metadata.GroupVersionKind()
-	resInt, err := mc.getResourceInterface(gvk, metadata.Namespace)
+	resInt, err := mc.getResourceInterface(ctx, gvk, metadata.Namespace)
 	if err != nil {
 		return err
 	}
@@ -127,7 +147,7 @@ func (mc *metadataClient) Get(ctx context.Context, key ObjectKey, obj Object, op
 	getOpts := GetOptions{}
 	getOpts.ApplyOptions(opts)
 
-	resInt, err := mc.getResourceInterface(gvk, key.Namespace)
+	resInt, err := mc.getResourceInterface(ctx, gvk, key.Namespace)
 	if err != nil {
 		return err
 	}
@@ -154,7 +174,7 @@ func (mc *metadataClient) List(ctx context.Context, obj ObjectList, opts ...List
 	listOpts := ListOptions{}
 	listOpts.ApplyOptions(opts)
 
-	resInt, err := mc.getResourceInterface(gvk, listOpts.Namespace)
+	resInt, err := mc.getResourceInterface(ctx, gvk, listOpts.Namespace)
 	if err != nil {
 		return err
 	}
@@ -175,7 +195,7 @@ func (mc *metadataClient) PatchSubResource(ctx context.Context, obj Object, subR
 	}
 
 	gvk := metadata.GroupVersionKind()
-	resInt, err := mc.getResourceInterface(gvk, metadata.Namespace)
+	resInt, err := mc.getResourceInterface(ctx, gvk, metadata.Namespace)
 	if err != nil {
 		return err
 	}

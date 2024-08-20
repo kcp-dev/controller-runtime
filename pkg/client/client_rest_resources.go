@@ -17,10 +17,13 @@ limitations under the License.
 package client
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"sync"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,7 +31,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
+
+type clusterResources struct {
+	mapper meta.RESTMapper
+
+	// structuredResourceByType stores structured type metadata
+	structuredResourceByType map[schema.GroupVersionKind]*resourceMeta
+	// unstructuredResourceByType stores unstructured type metadata
+	unstructuredResourceByType map[schema.GroupVersionKind]*resourceMeta
+}
 
 // clientRestResources creates and stores rest clients and metadata for Kubernetes types.
 type clientRestResources struct {
@@ -42,21 +55,18 @@ type clientRestResources struct {
 	scheme *runtime.Scheme
 
 	// mapper maps GroupVersionKinds to Resources
-	mapper meta.RESTMapper
+	mapper func(ctx context.Context) (meta.RESTMapper, error)
 
 	// codecs are used to create a REST client for a gvk
 	codecs serializer.CodecFactory
 
-	// structuredResourceByType stores structured type metadata
-	structuredResourceByType map[schema.GroupVersionKind]*resourceMeta
-	// unstructuredResourceByType stores unstructured type metadata
-	unstructuredResourceByType map[schema.GroupVersionKind]*resourceMeta
-	mu                         sync.RWMutex
+	clusterResources *lru.Cache[logicalcluster.Path, clusterResources]
+	mu               sync.RWMutex
 }
 
 // newResource maps obj to a Kubernetes Resource and constructs a client for that Resource.
 // If the object is a list, the resource represents the item's type instead.
-func (c *clientRestResources) newResource(gvk schema.GroupVersionKind, isList, isUnstructured bool) (*resourceMeta, error) {
+func (c *clientRestResources) newResource(gvk schema.GroupVersionKind, isList, isUnstructured bool, mapper meta.RESTMapper) (*resourceMeta, error) {
 	if strings.HasSuffix(gvk.Kind, "List") && isList {
 		// if this was a list, treat it as a request for the item's resource
 		gvk.Kind = gvk.Kind[:len(gvk.Kind)-4]
@@ -66,7 +76,7 @@ func (c *clientRestResources) newResource(gvk schema.GroupVersionKind, isList, i
 	if err != nil {
 		return nil, err
 	}
-	mapping, err := c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +85,7 @@ func (c *clientRestResources) newResource(gvk schema.GroupVersionKind, isList, i
 
 // getResource returns the resource meta information for the given type of object.
 // If the object is a list, the resource represents the item's type instead.
-func (c *clientRestResources) getResource(obj runtime.Object) (*resourceMeta, error) {
+func (c *clientRestResources) getResource(ctx context.Context, obj runtime.Object) (*resourceMeta, error) {
 	gvk, err := apiutil.GVKForObject(obj, c.scheme)
 	if err != nil {
 		return nil, err
@@ -86,9 +96,25 @@ func (c *clientRestResources) getResource(obj runtime.Object) (*resourceMeta, er
 	// It's better to do creation work twice than to not let multiple
 	// people make requests at once
 	c.mu.RLock()
-	resourceByType := c.structuredResourceByType
+	cluster, _ := kontext.ClusterFrom(ctx)
+	cr, found := c.clusterResources.Get(cluster.Path())
+	if !found {
+		m, err := c.mapper(ctx)
+		if err != nil {
+			c.mu.RUnlock()
+			return nil, err
+		}
+		cr = clusterResources{
+			mapper:                     m,
+			structuredResourceByType:   make(map[schema.GroupVersionKind]*resourceMeta),
+			unstructuredResourceByType: make(map[schema.GroupVersionKind]*resourceMeta),
+		}
+		c.clusterResources.Purge()
+		c.clusterResources.Add(cluster.Path(), cr)
+	}
+	resourceByType := cr.structuredResourceByType
 	if isUnstructured {
-		resourceByType = c.unstructuredResourceByType
+		resourceByType = cr.unstructuredResourceByType
 	}
 	r, known := resourceByType[gvk]
 	c.mu.RUnlock()
@@ -100,7 +126,7 @@ func (c *clientRestResources) getResource(obj runtime.Object) (*resourceMeta, er
 	// Initialize a new Client
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	r, err = c.newResource(gvk, meta.IsListType(obj), isUnstructured)
+	r, err = c.newResource(gvk, meta.IsListType(obj), isUnstructured, cr.mapper)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +135,8 @@ func (c *clientRestResources) getResource(obj runtime.Object) (*resourceMeta, er
 }
 
 // getObjMeta returns objMeta containing both type and object metadata and state.
-func (c *clientRestResources) getObjMeta(obj runtime.Object) (*objMeta, error) {
-	r, err := c.getResource(obj)
+func (c *clientRestResources) getObjMeta(ctx context.Context, obj runtime.Object) (*objMeta, error) {
+	r, err := c.getResource(ctx, obj)
 	if err != nil {
 		return nil, err
 	}
