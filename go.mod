@@ -32,6 +32,7 @@ require (
 )
 
 require (
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/kcp-dev/apimachinery/v2 v2.0.0-alpha.0.0.20230926071920-57d168bcbe34
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 )
