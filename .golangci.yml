@@ -13,7 +13,6 @@ linters:
     - errorlint
     - exhaustive
     - ginkgolinter
-    - goconst
     - gocritic
     - gocyclo
     - gofmt
