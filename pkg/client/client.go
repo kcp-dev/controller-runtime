@@ -62,6 +62,10 @@ type Options struct {
 
 	// DryRun instructs the client to only perform dry run requests.
 	DryRun *bool
+
+	// KcpClusterDiscoveryCacheSize is the size of the cache for cluster discovery
+	// information backing the client's REST mapper.
+	KcpClusterDiscoveryCacheSize int
 }
 
 // WarningHandlerOptions are options for configuring a
@@ -176,6 +180,10 @@ func newClient(config *rest.Config, options Options) (*client, error) {
 		}
 	}
 
+	if options.KcpClusterDiscoveryCacheSize == 0 {
+		options.KcpClusterDiscoveryCacheSize = 1000
+	}
+
 	// Init a MapperWithContext if none provided
 	if options.MapperWithContext == nil {
 		options.MapperWithContext = func(context.Context) (meta.RESTMapper, error) { return options.Mapper, nil }
@@ -188,7 +196,7 @@ func newClient(config *rest.Config, options Options) (*client, error) {
 		mapper:     options.MapperWithContext,
 		codecs:     serializer.NewCodecFactory(options.Scheme),
 	}
-	cr, err := lru.New[logicalcluster.Path, clusterResources](1000)
+	cr, err := lru.New[logicalcluster.Path, clusterResources](options.KcpClusterDiscoveryCacheSize)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +223,7 @@ func newClient(config *rest.Config, options Options) (*client, error) {
 		scheme: options.Scheme,
 		mapper: options.Mapper,
 	}
-	mapperCache, err := lru.New[logicalcluster.Name, meta.RESTMapper](1000)
+	mapperCache, err := lru.New[logicalcluster.Name, meta.RESTMapper](options.KcpClusterDiscoveryCacheSize)
 	if err != nil {
 		return nil, err
 	}
