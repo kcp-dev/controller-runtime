@@ -23,6 +23,8 @@ import (
 	"net/http"
 	"strings"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +49,10 @@ type Options struct {
 	// Mapper, if provided, will be used to map GroupVersionKinds to Resources
 	Mapper meta.RESTMapper
 
+	// MapperWithContext, if provided, will be used to map GroupVersionKinds to Resources.
+	// This overrides Mapper if set.
+	MapperWithContext func(context.Context) (meta.RESTMapper, error)
+
 	// Cache, if provided, is used to read objects from the cache.
 	Cache *CacheOptions
 
@@ -56,6 +62,10 @@ type Options struct {
 
 	// DryRun instructs the client to only perform dry run requests.
 	DryRun *bool
+
+	// KcpClusterDiscoveryCacheSize is the size of the cache for cluster discovery
+	// information backing the client's REST mapper.
+	KcpClusterDiscoveryCacheSize int
 }
 
 // WarningHandlerOptions are options for configuring a
@@ -170,16 +180,27 @@ func newClient(config *rest.Config, options Options) (*client, error) {
 		}
 	}
 
+	if options.KcpClusterDiscoveryCacheSize == 0 {
+		options.KcpClusterDiscoveryCacheSize = 1000
+	}
+
+	// Init a MapperWithContext if none provided
+	if options.MapperWithContext == nil {
+		options.MapperWithContext = func(context.Context) (meta.RESTMapper, error) { return options.Mapper, nil }
+	}
+
 	resources := &clientRestResources{
 		httpClient: options.HTTPClient,
 		config:     config,
 		scheme:     options.Scheme,
-		mapper:     options.Mapper,
+		mapper:     options.MapperWithContext,
 		codecs:     serializer.NewCodecFactory(options.Scheme),
-
-		structuredResourceByType:   make(map[schema.GroupVersionKind]*resourceMeta),
-		unstructuredResourceByType: make(map[schema.GroupVersionKind]*resourceMeta),
 	}
+	cr, err := lru.New[logicalcluster.Path, clusterResources](options.KcpClusterDiscoveryCacheSize)
+	if err != nil {
+		return nil, err
+	}
+	resources.clusterResources = cr
 
 	rawMetaClient, err := metadata.NewForConfigAndClient(metadata.ConfigFor(config), options.HTTPClient)
 	if err != nil {
@@ -197,11 +218,16 @@ func newClient(config *rest.Config, options Options) (*client, error) {
 		},
 		metadataClient: metadataClient{
 			client:     rawMetaClient,
-			restMapper: options.Mapper,
+			restMapper: options.MapperWithContext,
 		},
 		scheme: options.Scheme,
 		mapper: options.Mapper,
 	}
+	mapperCache, err := lru.New[logicalcluster.Name, meta.RESTMapper](options.KcpClusterDiscoveryCacheSize)
+	if err != nil {
+		return nil, err
+	}
+	c.metadataClient.mapperCache = mapperCache
 	if options.Cache == nil || options.Cache.Reader == nil {
 		return c, nil
 	}
