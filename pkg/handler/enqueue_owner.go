@@ -184,7 +184,7 @@ func (e *enqueueRequestForOwner[object]) getOwnerReconcileRequest(obj metav1.Obj
 		if ref.Kind == e.groupKind.Kind && refGV.Group == e.groupKind.Group {
 			// Match found - add a Request for the object referred to in the OwnerReference
 			request := reconcile.Request{
-				ClusterName: logicalcluster.From(object).String(),
+				ClusterName: logicalcluster.From(obj).String(),
 				NamespacedName: types.NamespacedName{
 					Name: ref.Name,
 				},
