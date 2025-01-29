@@ -127,17 +127,27 @@ func NewClusterAwareAPIReader(config *rest.Config, opts client.Options) (client.
 //		...
 //	}
 func NewClusterAwareClient(config *rest.Config, opts client.Options) (client.Client, error) {
+	opts, err := applyClientOptions(config, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.New(config, opts)
+}
+
+func applyClientOptions(config *rest.Config, opts client.Options) (client.Options, error) {
 	if opts.HTTPClient == nil {
 		httpClient, err := NewClusterAwareHTTPClient(config)
 		if err != nil {
-			return nil, err
+			return opts, err
 		}
 		opts.HTTPClient = httpClient
 	}
 	if opts.Mapper == nil && opts.MapperWithContext == nil {
 		opts.MapperWithContext = NewClusterAwareMapperProvider(config, opts.HTTPClient)
 	}
-	return client.New(config, opts)
+
+	return opts, nil
 }
 
 // NewClusterAwareHTTPClient returns an http.Client with a cluster aware round tripper.
@@ -149,6 +159,16 @@ func NewClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
 
 	httpClient.Transport = newClusterAwareRoundTripper(httpClient.Transport)
 	return httpClient, nil
+}
+
+// NewClusterAwareClientWithWatch returns a new WithWatch with a cluster aware client underneath.
+func NewClusterAwareClientWithWatch(config *rest.Config, options client.Options) (client.WithWatch, error) {
+	opts, err := applyClientOptions(config, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.NewWithWatch(config, opts)
 }
 
 // NewClusterAwareMapperProvider returns a function producing RESTMapper for the
