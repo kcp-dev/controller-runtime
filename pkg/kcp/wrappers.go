@@ -79,7 +79,7 @@ func NewClusterAwareCache(config *rest.Config, opts cache.Options) (cache.Cache,
 	c := rest.CopyConfig(config)
 	c.Host = strings.TrimSuffix(c.Host, "/") + "/clusters/*"
 
-	opts.NewInformerFunc = NewInformerWithClusterIndexes
+	opts.NewInformer = NewInformerWithClusterIndexes
 	return cache.New(c, opts)
 }
 
@@ -161,6 +161,7 @@ func NewClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
 	return httpClient, nil
 }
 
+// NewClusterAwareClientWithWatch returns a new WithWatch with a cluster aware client underneath.
 func NewClusterAwareClientWithWatch(config *rest.Config, options client.Options) (client.WithWatch, error) {
 	opts, err := applyClientOptions(config, options)
 	if err != nil {
