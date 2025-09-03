@@ -3,6 +3,9 @@
 
 # Kubernetes controller-runtime Project
 
+> [!WARNING]
+> This fork of controller-runtime is deprecated. Development focus is on kcp's [provider library](https://github.com/kcp-dev/multicluster-provider) for [multicluster-runtime](https://github.com/kubernetes-sigs/multicluster-runtime), an "addon" for upstream controller-runtime that allows writing pluggable multi-cluster controllers, which removes the need for maintaining a fork. We recommend migration to multicluster-runtime.
+
 The Kubernetes controller-runtime Project is a set of go libraries for building
 Controllers. It is leveraged by [Kubebuilder](https://book.kubebuilder.io/) and
 [Operator SDK](https://github.com/operator-framework/operator-sdk). Both are
